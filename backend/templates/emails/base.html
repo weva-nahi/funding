@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 0; background: #f4f7fa; }
+        .container { max-width: 600px; margin: 0 auto; background: #ffffff; }
+        .header { background: linear-gradient(135deg, #0f766e 0%, #134e4a 100%); padding: 32px; text-align: center; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 24px; }
+        .header p { color: #99f6e4; margin: 8px 0 0; font-size: 14px; }
+        .content { padding: 32px; color: #334155; line-height: 1.6; }
+        .btn { display: inline-block; background: #0f766e; color: #fff !important; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-weight: 600; margin: 16px 0; }
+        .footer { padding: 24px; text-align: center; color: #94a3b8; font-size: 12px; border-top: 1px solid #e2e8f0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Richat Funding Tracker</h1>
+            <p>Climate Finance for Mauritanian Businesses</p>
+        </div>
+        <div class="content">
+            {% block content %}{% endblock %}
+        </div>
+        <div class="footer">
+            <p>&copy; Richat Partners — Nouakchott, Mauritania</p>
+            <p>You received this email because you have an account on Richat Funding Tracker.</p>
+        </div>
+    </div>
+</body>
+</html>
