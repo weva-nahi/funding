@@ -41,3 +41,4 @@ make test       # Runs both frontend and backend tests
 make shell-be   # Opens Django shell
 make scrape     # Runs the celery web scraper manually
 ```
+# Richat_Funding_Tracker
