@@ -1,50 +1,63 @@
-# Environment
+# Environment & secrets
 .env
-.env.local
-.env.production
+.env.*
+!.env.example
+*.pem
+*.key
+nginx/certs/
+
+# Cookie / debug artifacts that were being committed
+cookies.txt
+admin_cookies.txt
+*.cookies
+
+# Generated data exports
+analytics_*.csv
+analytics_report.csv
 
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
 *.egg-info/
-dist/
-build/
-*.egg
-.pytest_cache/
-htmlcov/
-.coverage
-.coverage.*
-coverage.xml
+.venv/
+venv/
+*.sqlite3
+db.sqlite3
 
 # Django
-*.log
-db.sqlite3
-db.sqlite3-journal
-media/
-staticfiles/
+backend/media/
+backend/staticfiles/
+backend/static/
 
-# Node
+# Node / frontend
 node_modules/
-frontend/node_modules/
 frontend/dist/
 frontend/.vite/
-*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
 
-# IDE
-.vscode/
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE / OS
 .idea/
-*.swp
-*.swo
-*~
+.vscode/
 .DS_Store
-Thumbs.db
+*.swp
 
-# Docker
-*.pid
 
-# Misc
-*.bak
-*.tmp
-.cache/
+# .gitignore additions
+.env
+cookies*.txt
+**/admin_cookies.txt
+*.csv
+*.key
+*.pemadmin_cookies.txt
+cookies_admin.txt
+cookies_client.txt
+cookies.txt
+analytics_test.csv
+test_import.xlsx
+test_document.pdf
