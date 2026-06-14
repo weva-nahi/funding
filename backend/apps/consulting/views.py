@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from common.exceptions import NotFoundError
 from common.pagination import StandardPagination
 from common.permissions import IsAdmin
 
@@ -12,6 +13,8 @@ from .serializers import ConsultingCreateSerializer, ConsultingRequestSerializer
 
 
 class ClientConsultingListView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(responses={200: ConsultingRequestSerializer(many=True)}, tags=["Consulting"])
     def get(self, request):
         reqs = selectors.get_user_requests(user=request.user)
@@ -28,11 +31,13 @@ class ClientConsultingListView(APIView):
 
 
 class ClientConsultingDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(responses={200: ConsultingRequestSerializer}, tags=["Consulting"])
     def get(self, request, pk):
         req = selectors.get_request_by_id(request_id=pk)
         if req.user != request.user:
-            return Response({"detail": "Not found."}, status=404)
+            raise NotFoundError()
         return Response(ConsultingRequestSerializer(req).data)
 
 

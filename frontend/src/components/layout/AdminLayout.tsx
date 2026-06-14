@@ -3,7 +3,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import {
   LayoutDashboard, FileText, Globe, Upload, Bot, AlertTriangle, MessageSquare,
-  Users, BarChart3, Shield, LogOut, Menu, Settings
+  Users, BarChart3, Shield, LogOut, Menu
 } from 'lucide-react'
 
 const navItems = [

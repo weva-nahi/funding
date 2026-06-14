@@ -4,6 +4,16 @@ from django.conf import settings
 from django.db import models
 
 
+class AuditLogQuerySet(models.QuerySet):
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Audit logs cannot be deleted.")
+
+
+class AuditLogManager(models.Manager):
+    def get_queryset(self):
+        return AuditLogQuerySet(self.model, using=self._db)
+
+
 class AuditLog(models.Model):
     """Immutable audit trail entry."""
 
@@ -17,10 +27,11 @@ class AuditLog(models.Model):
     ip_address = models.GenericIPAddressField(null=True)
     user_agent = models.TextField(blank=True)
 
+    objects = AuditLogManager()
+
     class Meta:
         db_table = "audit_logs"
         ordering = ["-timestamp"]
-        # Prevent deletion at the model level
         managed = True
 
     def __str__(self):

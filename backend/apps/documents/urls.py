@@ -8,5 +8,6 @@ urlpatterns = [
     path("upload/", views.DocumentUploadView.as_view(), name="upload"),
     path("application/<int:application_id>/", views.DocumentListView.as_view(), name="list"),
     path("<int:pk>/delete/", views.DocumentDeleteView.as_view(), name="delete"),
-    path("<int:pk>/download/", views.DocumentDownloadView.as_view(), name="download"),
+    path("<int:pk>/signed-url/", views.DocumentSignedUrlView.as_view(), name="signed-url"),
+    path("download/<str:token>/", views.DocumentDownloadView.as_view(), name="download"),
 ]

@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.opportunities.selectors import get_opportunity_by_id
+from common.exceptions import NotFoundError
 from common.pagination import StandardPagination
 from common.permissions import IsAdmin
 
@@ -19,6 +20,8 @@ from .serializers import (
 
 
 class ClientApplicationListView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(responses={200: ApplicationListSerializer(many=True)}, tags=["Applications"])
     def get(self, request):
         apps = selectors.get_user_applications(
@@ -41,38 +44,46 @@ class ClientApplicationListView(APIView):
 
 
 class ClientApplicationDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(responses={200: ApplicationDetailSerializer}, tags=["Applications"])
     def get(self, request, pk):
         app = selectors.get_application_by_id(application_id=pk)
         if app.user != request.user and request.user.role != "admin":
-            return Response({"detail": "Not found."}, status=404)
+            raise NotFoundError()
         return Response(ApplicationDetailSerializer(app).data)
 
     @extend_schema(request=ApplicationUpdateSerializer, tags=["Applications"])
     def patch(self, request, pk):
         app = selectors.get_application_by_id(application_id=pk)
         if app.user != request.user:
-            return Response({"detail": "Not found."}, status=404)
-        app = services.update_draft(application=app, **request.data)
+            raise NotFoundError()
+        serializer = ApplicationUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        app = services.update_draft(application=app, **serializer.validated_data)
         return Response(ApplicationDetailSerializer(app).data)
 
 
 class SubmitApplicationView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(tags=["Applications"])
     def post(self, request, pk):
         app = selectors.get_application_by_id(application_id=pk)
         if app.user != request.user:
-            return Response({"detail": "Not found."}, status=404)
+            raise NotFoundError()
         app = services.submit_application(application=app, user=request.user)
         return Response(ApplicationDetailSerializer(app).data)
 
 
 class WithdrawApplicationView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(tags=["Applications"])
     def post(self, request, pk):
         app = selectors.get_application_by_id(application_id=pk)
         if app.user != request.user:
-            return Response({"detail": "Not found."}, status=404)
+            raise NotFoundError()
         app = services.withdraw_application(application=app, user=request.user)
         return Response(ApplicationDetailSerializer(app).data)
 
@@ -126,6 +137,8 @@ class ReviewApplicationView(APIView):
                 admin_user=request.user,
                 reason=serializer.validated_data.get("reason", ""),
             )
+        elif action == "in_review":
+            app = services.set_in_review(application=app, admin_user=request.user)
 
         return Response(ApplicationDetailSerializer(app).data)
 
@@ -149,7 +162,7 @@ class BulkReviewView(APIView):
                 elif action == "reject":
                     services.reject_application(application=app, admin_user=request.user, reason=reason)
                 results.append({"id": app_id, "success": True})
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 results.append({"id": app_id, "success": False, "error": str(e)})
 
         return Response({"results": results})

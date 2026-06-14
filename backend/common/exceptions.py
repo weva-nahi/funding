@@ -1,12 +1,23 @@
 """Standardized API exception handling."""
 
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied as DjangoPermissionDenied
+from django.http import Http404
 from rest_framework import status
-from rest_framework.exceptions import APIException
+from rest_framework.exceptions import APIException, NotFound, PermissionDenied
 from rest_framework.views import exception_handler
 
 
 def custom_exception_handler(exc, context):
-    """Wrap DRF exceptions in a consistent format."""
+    """Wrap DRF and common Django exceptions in a consistent format."""
+    if isinstance(exc, Http404):
+        exc = NotFound()
+    elif isinstance(exc, ObjectDoesNotExist):
+        exc = NotFound(detail="The requested resource was not found.")
+    elif isinstance(exc, DjangoPermissionDenied):
+        exc = PermissionDenied()
+    elif isinstance(exc, PermissionError):
+        exc = PermissionDenied(detail=str(exc) or "You do not have permission to perform this action.")
+
     response = exception_handler(exc, context)
 
     if response is not None:
@@ -39,8 +50,6 @@ def _extract_message(data):
 
 
 class ApplicationError(APIException):
-    """Base exception for business logic errors."""
-
     status_code = status.HTTP_400_BAD_REQUEST
     default_detail = "A business logic error occurred."
     default_code = "application_error"

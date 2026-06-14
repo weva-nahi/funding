@@ -5,6 +5,7 @@ import logging
 from django.utils import timezone
 
 from apps.opportunities.models import FundingOpportunity
+from common.exceptions import NotFoundError
 
 from .models import ScrapingAlert, ScrapingJob
 from .scrapers.afd import AFDScraper
@@ -32,21 +33,17 @@ def run_scraper(*, source: str, max_pages: int = 5, progress_callback=None):
     scraper_class = SCRAPER_MAPPING.get(source.lower())
     if not scraper_class:
         raise ValueError(f"Unknown source: {source}. Available: {list(SCRAPER_MAPPING.keys())}")
-
     scraper = scraper_class()
     return scraper.scrape(max_pages=max_pages, progress_callback=progress_callback)
 
 
 def save_projects(*, projects: list, job: ScrapingJob):
-    created = 0
-    duplicates = 0
-
+    created = duplicates = 0
     for project_data in projects:
         hash_val = project_data.get("hash", "")
-        if FundingOpportunity.objects.filter(hash=hash_val).exists():
+        if not hash_val or FundingOpportunity.objects.filter(hash=hash_val).exists():
             duplicates += 1
             continue
-
         opp = FundingOpportunity.objects.create(
             title=project_data.get("title", ""),
             source=project_data.get("source", ""),
@@ -64,11 +61,8 @@ def save_projects(*, projects: list, job: ScrapingJob):
             status="draft",
             metadata=project_data.get("metadata", {}),
         )
-
-        priority = classify_priority(opp)
-        ScrapingAlert.objects.create(opportunity=opp, job=job, priority=priority)
+        ScrapingAlert.objects.create(opportunity=opp, job=job, priority=classify_priority(opp))
         created += 1
-
     return {"created": created, "duplicates": duplicates}
 
 
@@ -85,24 +79,32 @@ def classify_priority(opportunity):
     return "low"
 
 
+def _get_alert(alert_id: int) -> ScrapingAlert:
+    try:
+        return ScrapingAlert.objects.select_related("opportunity").get(id=alert_id)
+    except ScrapingAlert.DoesNotExist:
+        raise NotFoundError("Scraping alert not found.")
+
+
 def publish_alert(*, alert_id: int):
-    alert = ScrapingAlert.objects.select_related("opportunity").get(id=alert_id)
+    alert = _get_alert(alert_id)
     alert.opportunity.status = "published"
-    alert.opportunity.save(update_fields=["status"])
+    alert.opportunity.published_at = timezone.now()
+    alert.opportunity.save(update_fields=["status", "published_at"])
     alert.status = "published"
     alert.save(update_fields=["status"])
     return alert
 
 
 def archive_alert(*, alert_id: int):
-    alert = ScrapingAlert.objects.get(id=alert_id)
+    alert = _get_alert(alert_id)
     alert.status = "archived"
     alert.save(update_fields=["status"])
     return alert
 
 
 def ignore_alert(*, alert_id: int):
-    alert = ScrapingAlert.objects.get(id=alert_id)
+    alert = _get_alert(alert_id)
     alert.status = "ignored"
     alert.save(update_fields=["status"])
     return alert

@@ -1,27 +1,36 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import api from '@/lib/axios'
-import { notificationWS } from '@/lib/websocket'
+import { scrapingWS } from '@/lib/websocket'
 import { SOURCES } from '@/lib/constants'
 import { formatDate } from '@/utils/formatDate'
 import { Activity, Play, XSquare } from 'lucide-react'
+import type { Paginated, ScrapingJob } from '@/types'
+
+interface ScrapingUpdate {
+  job_id: number
+  pages_scraped: number
+  total_pages: number
+  projects_found: number
+  status: string
+}
 
 export function ScrapingDashboardPage() {
   const queryClient = useQueryClient()
   const [source, setSource] = useState('gef')
   const [pages, setPages] = useState(5)
-  const [activeJobs, setActiveJobs] = useState<Record<number, any>>({})
+  const [activeJobs, setActiveJobs] = useState<Record<number, ScrapingUpdate>>({})
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<Paginated<ScrapingJob>>({
     queryKey: ['scraping-jobs'],
     queryFn: () => api.get('/scraping/jobs/').then(r => r.data),
   })
 
-  // Listen to WebSocket for real-time progress
   useEffect(() => {
-    notificationWS.connect()
-    const unsubscribe = notificationWS.subscribe((msg: any) => {
-      if (msg.type === 'scraping_update') {
+    scrapingWS.connect()
+    const unsubscribe = scrapingWS.subscribe((raw) => {
+      const msg = raw as { type?: string; data?: ScrapingUpdate }
+      if (msg.type === 'scraping_update' && msg.data) {
         const d = msg.data
         setActiveJobs(prev => ({ ...prev, [d.job_id]: d }))
         if (d.status === 'completed' || d.status === 'failed') {
@@ -29,7 +38,7 @@ export function ScrapingDashboardPage() {
         }
       }
     })
-    return () => { unsubscribe(); notificationWS.disconnect() }
+    return () => { unsubscribe(); scrapingWS.disconnect() }
   }, [queryClient])
 
   const startMutation = useMutation({
@@ -58,7 +67,7 @@ export function ScrapingDashboardPage() {
         </div>
         <div className="flex-1 w-full space-y-1.5">
           <label className="text-sm font-medium">Max Pages</label>
-          <input type="number" value={pages} onChange={e => setPages(parseInt(e.target.value) || 1)} min={1} max={50} className="w-full rounded-lg border px-3 py-2.5 text-sm" />
+          <input type="number" value={pages} onChange={e => setPages(parseInt(e.target.value) || 1)} min={1} max={20} className="w-full rounded-lg border px-3 py-2.5 text-sm" />
         </div>
         <button onClick={() => startMutation.mutate()} disabled={startMutation.isPending}
           className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-8 py-2.5 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:opacity-50">
@@ -84,16 +93,15 @@ export function ScrapingDashboardPage() {
             <tbody>
               {isLoading ? (
                 <tr><td colSpan={7} className="px-6 py-8 text-center"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" /></td></tr>
-              ) : data?.results?.length === 0 ? (
+              ) : (data?.results?.length ?? 0) === 0 ? (
                 <tr><td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">No scraping jobs run yet.</td></tr>
               ) : (
-                data?.results?.map((job: any) => {
+                data?.results?.map((job) => {
                   const wsData = activeJobs[job.id] || null
                   const status = wsData?.status || job.status
                   const isRunning = status === 'running' || status === 'pending'
                   const progressStr = wsData ? `${wsData.pages_scraped}/${wsData.total_pages}` : `${job.pages_scraped} pages`
                   const found = wsData?.projects_found ?? job.projects_found
-
                   return (
                     <tr key={job.id} className="border-b last:border-0 hover:bg-muted/20">
                       <td className="px-6 py-4 font-medium">#{job.id}</td>
@@ -114,9 +122,9 @@ export function ScrapingDashboardPage() {
                       <td className="px-6 py-4 text-muted-foreground whitespace-nowrap">{formatDate(job.started_at)}</td>
                       <td className="px-6 py-4 text-right">
                         {isRunning && (
-                           <button onClick={() => cancelMutation.mutate(job.id)} className="text-red-500 hover:text-red-700 rounded-lg p-1 hover:bg-red-50">
-                             <XSquare className="h-5 w-5" />
-                           </button>
+                          <button onClick={() => cancelMutation.mutate(job.id)} className="text-red-500 hover:text-red-700 rounded-lg p-1 hover:bg-red-50">
+                            <XSquare className="h-5 w-5" />
+                          </button>
                         )}
                       </td>
                     </tr>

@@ -32,6 +32,9 @@ class Application(TimestampMixin):
         db_table = "applications"
         ordering = ["-created_at"]
         unique_together = ["user", "opportunity"]
+        indexes = [
+            models.Index(fields=["status", "-created_at"], name="app_status_created_idx"),
+        ]
 
     def __str__(self):
         return f"{self.user.email} → {self.opportunity.title}"
@@ -49,3 +52,6 @@ class ApplicationStatusHistory(TimestampMixin):
     class Meta:
         db_table = "application_status_history"
         ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.application_id}: {self.from_status or '∅'} → {self.to_status}"

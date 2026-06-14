@@ -1,6 +1,10 @@
 """Application selectors."""
 
-from django.db.models import Q
+from datetime import timedelta
+
+from django.db.models import Count, Q
+from django.db.models.functions import TruncMonth
+from django.utils import timezone
 
 from .models import Application, ApplicationStatusHistory
 
@@ -42,17 +46,11 @@ def get_application_timeline(*, application_id: int):
 
 
 def get_application_stats():
-    from django.db.models import Count
-
     return Application.objects.values("status").annotate(count=Count("id"))
 
 
 def get_monthly_stats(*, months=6):
-    from django.db.models import Count
-    from django.db.models.functions import TruncMonth
-    from django.utils import timezone
-
-    since = timezone.now() - timezone.timedelta(days=months * 30)
+    since = timezone.now() - timedelta(days=months * 30)
     return (
         Application.objects.filter(created_at__gte=since)
         .annotate(month=TruncMonth("created_at"))

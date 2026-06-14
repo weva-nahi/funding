@@ -1,8 +1,7 @@
-version: "3.9"
-
 services:
   db:
     image: postgres:16-alpine
+    container_name: richat_db
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-richat_db}
@@ -13,60 +12,58 @@ services:
     ports:
       - "5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-richat_user} -d ${POSTGRES_DB:-richat_db}"]
-      interval: 5s
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-richat_user} -d ${POSTGRES_DB:-richat_db}
+      interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 20s
 
   redis:
     image: redis:7-alpine
+    container_name: richat_redis
     restart: unless-stopped
+    # --loglevel warning suppresses the verbose startup lines
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --loglevel warning
     volumes:
       - redis_data:/data
     ports:
       - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 5s
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: richat_backend
     restart: unless-stopped
     command: >
       sh -c "python manage.py migrate --noinput &&
-             python manage.py collectstatic --noinput &&
              python manage.py create_demo_accounts &&
              daphne -b 0.0.0.0 -p 8000 config.asgi:application"
     volumes:
       - ./backend:/app
-      - backend_static:/app/staticfiles
-      - backend_media:/app/media
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+    env_file:
+      - .env
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.development
-      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
-      - DEBUG=${DEBUG:-True}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
-      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
-      - POSTGRES_DB=${POSTGRES_DB:-richat_db}
-      - POSTGRES_USER=${POSTGRES_USER:-richat_user}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-richat_password_change_me}
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/1
-      - CELERY_RESULT_BACKEND=redis://redis:6379/2
-      - CHANNEL_LAYERS_BACKEND=redis://redis:6379/3
-      - EMAIL_BACKEND=${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
-      - EMAIL_HOST=${EMAIL_HOST:-smtp.gmail.com}
-      - EMAIL_PORT=${EMAIL_PORT:-587}
-      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-True}
-      - EMAIL_HOST_USER=${EMAIL_HOST_USER:-}
-      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
-      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-noreply@richat.mr}
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      # Allow the Vite dev server origin so CORS doesn't block API calls
+      CORS_ALLOW_ALL_ORIGINS: "True"
     ports:
       - "8000:8000"
     depends_on:
@@ -74,36 +71,35 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "curl -sf http://localhost:8000/api/v1/health/ || exit 1"
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      # Give Django time to run migrations + create demo accounts before
+      # declaring the service healthy. On a cold start this can take 60s.
+      start_period: 90s
 
   celery_worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: richat_celery_worker
     restart: unless-stopped
-    command: celery -A config worker -l info --concurrency=2
+    command: celery -A config worker -l info --concurrency=2 -Q celery
     volumes:
       - ./backend:/app
-      - backend_media:/app/media
+      - media_data:/app/media
+    env_file:
+      - .env
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.development
-      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
-      - POSTGRES_DB=${POSTGRES_DB:-richat_db}
-      - POSTGRES_USER=${POSTGRES_USER:-richat_user}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-richat_password_change_me}
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/1
-      - CELERY_RESULT_BACKEND=redis://redis:6379/2
-      - EMAIL_BACKEND=${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
-      - EMAIL_HOST=${EMAIL_HOST:-smtp.gmail.com}
-      - EMAIL_PORT=${EMAIL_PORT:-587}
-      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-True}
-      - EMAIL_HOST_USER=${EMAIL_HOST_USER:-}
-      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
-      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-noreply@richat.mr}
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
     depends_on:
-      db:
+      backend:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -112,23 +108,21 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: richat_celery_beat
     restart: unless-stopped
-    command: celery -A config beat -l info --schedule=/tmp/celerybeat-schedule
+    command: >
+      celery -A config beat -l info
+      --scheduler django_celery_beat.schedulers:DatabaseScheduler
     volumes:
       - ./backend:/app
+    env_file:
+      - .env
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.development
-      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
-      - POSTGRES_DB=${POSTGRES_DB:-richat_db}
-      - POSTGRES_USER=${POSTGRES_USER:-richat_user}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-richat_password_change_me}
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/1
-      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
     depends_on:
-      db:
+      backend:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -137,33 +131,26 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    container_name: richat_frontend
     restart: unless-stopped
     command: npm run dev -- --host 0.0.0.0 --port 5173
     volumes:
       - ./frontend:/app
+      # Anonymous volume prevents the host node_modules from shadowing
+      # the container's installed packages
       - /app/node_modules
+    environment:
+      # These are used at build time only; at runtime the Vite proxy
+      # handles routing, so no hardcoded URLs are needed in the browser.
+      VITE_API_URL: ""
+      VITE_WS_URL: ""
     ports:
       - "5173:5173"
-    environment:
-      - VITE_API_URL=http://localhost:8000
-      - VITE_WS_URL=ws://localhost:8000
-
-  nginx:
-    build:
-      context: ./nginx
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    volumes:
-      - backend_static:/usr/share/nginx/static
-      - backend_media:/usr/share/nginx/media
     depends_on:
       - backend
-      - frontend
 
 volumes:
   postgres_data:
   redis_data:
-  backend_static:
-  backend_media:
+  media_data:
+  static_data:

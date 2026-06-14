@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── CSS Custom Properties (Design Tokens) ─────────────────────────────── */
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -57,25 +58,127 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.3); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
+/* ─── Keyframe Definitions ───────────────────────────────────────────────── */
+/*
+  These @keyframes are referenced by the animation utilities below.
+  They must be declared at root level (not inside @layer) so browsers
+  can find them regardless of Tailwind layer ordering.
+*/
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
-/* TipTap editor styles */
+@keyframes slide-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(14, 165, 133, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(14, 165, 133, 0.6);
+  }
+}
+
+/* ─── Custom Utility Classes ─────────────────────────────────────────────── */
+/*
+  IMPORTANT: placing these in @layer utilities ensures Tailwind JIT includes
+  them in the production bundle even when they only appear in dynamic
+  className strings (e.g. className="animate-fade-in").
+  Without @layer utilities, JIT drops them from production builds.
+*/
+@layer utilities {
+  .animate-fade-in {
+    animation: fade-in 0.5s ease-out both;
+  }
+
+  .animate-slide-in {
+    animation: slide-in 0.3s ease-out both;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  /* Staggered entry animation for lists */
+  .animate-stagger > * {
+    animation: fade-in 0.5s ease-out both;
+  }
+  .animate-stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .animate-stagger > *:nth-child(2) { animation-delay: 75ms; }
+  .animate-stagger > *:nth-child(3) { animation-delay: 150ms; }
+  .animate-stagger > *:nth-child(4) { animation-delay: 225ms; }
+  .animate-stagger > *:nth-child(5) { animation-delay: 300ms; }
+  .animate-stagger > *:nth-child(6) { animation-delay: 375ms; }
+}
+
+/* ─── Custom Scrollbar ───────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* ─── TipTap Rich Text Editor ────────────────────────────────────────────── */
 .tiptap-editor .ProseMirror {
   @apply min-h-[200px] p-4 focus:outline-none;
 }
+
 .tiptap-editor .ProseMirror p.is-editor-empty:first-child::before {
   @apply text-muted-foreground;
   content: attr(data-placeholder);
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+.tiptap-editor .ProseMirror h2 {
+  @apply text-xl font-bold mt-4 mb-2;
+}
+
+.tiptap-editor .ProseMirror h3 {
+  @apply text-lg font-semibold mt-3 mb-1;
+}
+
+.tiptap-editor .ProseMirror ul {
+  @apply list-disc pl-6 my-2;
+}
+
+.tiptap-editor .ProseMirror ol {
+  @apply list-decimal pl-6 my-2;
+}
+
+.tiptap-editor .ProseMirror blockquote {
+  @apply border-l-4 border-primary/40 pl-4 italic text-muted-foreground my-4;
 }

@@ -1,4 +1,5 @@
 from drf_spectacular.utils import extend_schema
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -9,6 +10,8 @@ from .serializers import NotificationSerializer
 
 
 class NotificationListView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(responses={200: NotificationSerializer(many=True)}, tags=["Notifications"])
     def get(self, request):
         category = request.query_params.get("category")
@@ -22,6 +25,8 @@ class NotificationListView(APIView):
 
 
 class UnreadCountView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(tags=["Notifications"])
     def get(self, request):
         count = selectors.get_unread_count(user=request.user)
@@ -29,6 +34,8 @@ class UnreadCountView(APIView):
 
 
 class MarkReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(tags=["Notifications"])
     def post(self, request, pk):
         services.mark_as_read(notification_id=pk, user=request.user)
@@ -36,6 +43,8 @@ class MarkReadView(APIView):
 
 
 class MarkAllReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(tags=["Notifications"])
     def post(self, request):
         services.mark_all_as_read(user=request.user)
@@ -43,6 +52,8 @@ class MarkAllReadView(APIView):
 
 
 class ArchiveView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(tags=["Notifications"])
     def post(self, request, pk):
         services.archive_notification(notification_id=pk, user=request.user)

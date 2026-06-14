@@ -1,10 +1,10 @@
-"""
-Django base settings for Richat Funding Tracker.
-"""
+"""Django base settings for Richat Funding Tracker."""
 
 import os
 from datetime import timedelta
 from pathlib import Path
+
+from celery.schedules import crontab
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -14,7 +14,6 @@ ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(","
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
-# ─── Applications ───
 DJANGO_APPS = [
     "daphne",
     "django.contrib.admin",
@@ -52,7 +51,6 @@ LOCAL_APPS = [
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
-# ─── Middleware ───
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -86,7 +84,6 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
-# ─── Database ───
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -98,7 +95,16 @@ DATABASES = {
     }
 }
 
-# ─── Auth ───
+# Cache (Redis). Email-verification and password-reset tokens live here and MUST be
+# shared across Daphne/Celery processes, so LocMemCache is never used.
+REDIS_CACHE_URL = os.environ.get("REDIS_CACHE_URL", "redis://redis:6379/4")
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_CACHE_URL,
+    }
+}
+
 AUTH_USER_MODEL = "authentication.User"
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -108,7 +114,6 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# ─── REST Framework ───
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework_simplejwt.authentication.JWTAuthentication",),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
@@ -123,6 +128,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "30/minute",
@@ -133,7 +139,6 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "common.exceptions.custom_exception_handler",
 }
 
-# ─── SimpleJWT ───
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(os.environ.get("ACCESS_TOKEN_LIFETIME_MINUTES", 15))),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=int(os.environ.get("REFRESH_TOKEN_LIFETIME_DAYS", 7))),
@@ -143,13 +148,9 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
-# ─── CORS ───
-CORS_ALLOWED_ORIGINS = [
-    FRONTEND_URL,
-]
+CORS_ALLOWED_ORIGINS = [FRONTEND_URL]
 CORS_ALLOW_CREDENTIALS = True
 
-# ─── Channel Layers (WebSocket) ───
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -159,7 +160,6 @@ CHANNEL_LAYERS = {
     },
 }
 
-# ─── Celery ───
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://redis:6379/1")
 CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://redis:6379/2")
 CELERY_ACCEPT_CONTENT = ["json"]
@@ -168,7 +168,13 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "UTC"
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
-# ─── drf-spectacular ───
+CELERY_BEAT_SCHEDULE = {
+    "send-deadline-reminders": {
+        "task": "apps.notifications.tasks.send_deadline_reminders",
+        "schedule": crontab(hour=7, minute=0),
+    },
+}
+
 SPECTACULAR_SETTINGS = {
     "TITLE": "Richat Funding Tracker API",
     "DESCRIPTION": "API for managing climate funding opportunities for Mauritanian businesses",
@@ -186,16 +192,15 @@ SPECTACULAR_SETTINGS = {
         {"name": "Consulting", "description": "Consulting requests"},
         {"name": "Analytics", "description": "Platform analytics"},
         {"name": "Audit", "description": "Audit logs"},
+        {"name": "System", "description": "Health and system endpoints"},
     ],
 }
 
-# ─── Internationalization ───
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
-# ─── Static & Media ───
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
@@ -203,7 +208,6 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# ─── File Upload Settings ───
 MAX_FILE_SIZE_MB = int(os.environ.get("MAX_FILE_SIZE_MB", 10))
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 ALLOWED_FILE_TYPES = os.environ.get(
@@ -213,15 +217,17 @@ ALLOWED_FILE_TYPES = os.environ.get(
     "image/jpeg,image/png",
 ).split(",")
 
-# ─── Scraping Settings ───
 SCRAPING_DELAY_SECONDS = int(os.environ.get("SCRAPING_DELAY_SECONDS", 2))
 SCRAPING_MAX_PAGES_DEFAULT = int(os.environ.get("SCRAPING_MAX_PAGES_DEFAULT", 5))
 CHROME_BINARY_PATH = os.environ.get("CHROME_BINARY_PATH", "/usr/bin/chromium")
 CHROMEDRIVER_PATH = os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
 
-# ─── Account Lockout ───
 ACCOUNT_LOCKOUT_ATTEMPTS = 5
 ACCOUNT_LOCKOUT_DURATION_MINUTES = 30
 
-# ─── Signed URL Expiry ───
-SIGNED_URL_EXPIRY_SECONDS = 3600  # 1 hour
+SIGNED_URL_EXPIRY_SECONDS = int(os.environ.get("SIGNED_URL_EXPIRY_SECONDS", 3600))
+
+# Business rule constants (no more magic numbers)
+REJECTION_REASON_MIN_LENGTH = 20
+PROCESSING_TIME_SAMPLE_LIMIT = 500
+DEADLINE_REMINDER_DAYS = [7, 1]

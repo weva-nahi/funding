@@ -1,12 +1,15 @@
-"""Audit middleware — auto-logs API write operations."""
+"""Audit middleware — auto-logs API write operations with record id."""
 
 import logging
+import re
 
 from .services import create_audit_log
 
 logger = logging.getLogger(__name__)
 
 AUDIT_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+_ACTION_BY_METHOD = {"POST": "CREATE", "PUT": "UPDATE", "PATCH": "UPDATE", "DELETE": "DELETE"}
+_ID_RE = re.compile(r"/(\d+)/")
 
 
 class AuditLogMiddleware:
@@ -21,15 +24,17 @@ class AuditLogMiddleware:
                 user = request.user if request.user.is_authenticated else None
                 ip = self._get_client_ip(request)
                 ua = request.META.get("HTTP_USER_AGENT", "")
-
                 create_audit_log(
                     user=user,
-                    action=f"{request.method} {request.path}",
+                    action=_ACTION_BY_METHOD.get(request.method, request.method),
                     model_name=self._extract_model(request.path),
+                    record_id=self._extract_record_id(request.path),
+                    data_after={"method": request.method, "path": request.path,
+                                "status": response.status_code},
                     ip_address=ip,
                     user_agent=ua[:500],
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Audit log failed: {e}")
 
         return response
@@ -41,5 +46,9 @@ class AuditLogMiddleware:
         return request.META.get("REMOTE_ADDR")
 
     def _extract_model(self, path):
-        parts = [p for p in path.split("/") if p and p != "api" and p != "v1"]
+        parts = [p for p in path.split("/") if p and p not in ("api", "v1")]
         return parts[0] if parts else "unknown"
+
+    def _extract_record_id(self, path):
+        match = _ID_RE.search(path)
+        return int(match.group(1)) if match else None

@@ -10,8 +10,11 @@ app = Celery("richat")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()
 
+from django.conf import settings  # noqa: E402
+
+app.conf.beat_schedule = getattr(settings, "CELERY_BEAT_SCHEDULE", {})
+
 
 @app.task(bind=True, ignore_result=True)
 def debug_task(self):
-    """Debug task to verify Celery is working."""
     print(f"Request: {self.request!r}")

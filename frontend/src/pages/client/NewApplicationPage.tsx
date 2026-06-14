@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/axios'
-import { useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { validateFile } from '@/utils/validateFile'
-import { FileText, Upload, X, ArrowLeft, Send, Trash2 } from 'lucide-react'
+import { FileText, Upload, ArrowLeft, Send, Trash2 } from 'lucide-react'
+import type { Opportunity } from '@/types'
 
 export function NewApplicationPage() {
   const { id } = useParams()
@@ -17,7 +17,7 @@ export function NewApplicationPage() {
   const [appId, setAppId] = useState<number | null>(null)
   const [error, setError] = useState('')
 
-  const { data: opp } = useQuery({
+  const { data: opp } = useQuery<Opportunity>({
     queryKey: ['opportunity', id],
     queryFn: () => api.get(`/opportunities/${id}/`).then(r => r.data),
   })
@@ -25,17 +25,23 @@ export function NewApplicationPage() {
   const createMutation = useMutation({
     mutationFn: () => api.post('/applications/', { opportunity_id: parseInt(id!) }),
     onSuccess: (res) => { setAppId(res.data.id); setStep(2) },
-    onError: (err: any) => setError(err.response?.data?.error?.message || 'Failed to create application.'),
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { error?: { message?: string } } } }
+      setError(ax.response?.data?.error?.message || 'Failed to create application.')
+    },
   })
 
   const updateMutation = useMutation({
     mutationFn: () => api.patch(`/applications/${appId}/`, { motivation_letter: letter }),
     onSuccess: () => setStep(3),
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { error?: { message?: string } } } }
+      setError(ax.response?.data?.error?.message || 'Failed to save letter.')
+    },
   })
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      // Upload files
       for (const file of files) {
         const formData = new FormData()
         formData.append('file', file)
@@ -48,25 +54,31 @@ export function NewApplicationPage() {
       queryClient.invalidateQueries({ queryKey: ['my-applications'] })
       navigate('/applications')
     },
-    onError: (err: any) => setError(err.response?.data?.error?.message || 'Submission failed.'),
+    onError: (err: unknown) => {
+      const ax = err as { response?: { data?: { error?: { message?: string } } } }
+      setError(ax.response?.data?.error?.message || 'Submission failed.')
+    },
   })
 
   const onDrop = useCallback((accepted: File[]) => {
     for (const file of accepted) {
-      const { valid, error } = validateFile(file)
-      if (!valid) { setError(error!); return }
+      const { valid, error: ferr } = validateFile(file)
+      if (!valid) { setError(ferr!); return }
     }
     setFiles(prev => [...prev, ...accepted])
     setError('')
   }, [])
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, accept: { 'application/pdf': ['.pdf'], 'image/*': ['.jpeg', '.jpg', '.png'] } })
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+    },
+  })
 
-  const steps = [
-    { num: 1, label: 'Start' },
-    { num: 2, label: 'Motivation' },
-    { num: 3, label: 'Documents' },
-  ]
+  const steps = [{ num: 1, label: 'Start' }, { num: 2, label: 'Motivation' }, { num: 3, label: 'Documents' }]
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
@@ -76,7 +88,6 @@ export function NewApplicationPage() {
 
       <h1 className="text-2xl font-bold">Apply: {opp?.title}</h1>
 
-      {/* Step indicator */}
       <div className="flex items-center gap-2">
         {steps.map(({ num, label }, i) => (
           <div key={num} className="flex items-center gap-2">
@@ -94,7 +105,9 @@ export function NewApplicationPage() {
           <div className="space-y-4 text-center">
             <FileText className="mx-auto h-12 w-12 text-primary opacity-60" />
             <h2 className="text-lg font-semibold">Ready to apply?</h2>
-            <p className="text-muted-foreground text-sm">This will create a draft application for "{opp?.title}". You can edit it before submitting.</p>
+            <p className="text-muted-foreground text-sm">
+              This will create a draft application for "{opp?.title}". You can edit it before submitting.
+            </p>
             <button onClick={() => createMutation.mutate()} disabled={createMutation.isPending}
               className="rounded-lg bg-primary px-8 py-2.5 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50">
               {createMutation.isPending ? 'Creating...' : 'Create Draft Application'}
@@ -106,7 +119,8 @@ export function NewApplicationPage() {
           <div className="space-y-4">
             <h2 className="text-lg font-semibold">Motivation Letter</h2>
             <p className="text-sm text-muted-foreground">Explain why your organization is a good fit for this funding.</p>
-            <textarea value={letter} onChange={e => setLetter(e.target.value)} rows={10} placeholder="Write your motivation letter..."
+            <textarea value={letter} onChange={e => setLetter(e.target.value)} rows={10}
+              placeholder="Write your motivation letter..."
               className="w-full rounded-lg border p-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" />
             <p className="text-xs text-muted-foreground">{letter.length} characters</p>
             <div className="flex gap-3 justify-end">
@@ -125,7 +139,9 @@ export function NewApplicationPage() {
             <div {...getRootProps()} className={`rounded-lg border-2 border-dashed p-8 text-center cursor-pointer transition-colors ${isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/20 hover:border-primary/50'}`}>
               <input {...getInputProps()} />
               <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">{isDragActive ? 'Drop files here...' : 'Drag & drop files or click to browse'}</p>
+              <p className="text-sm text-muted-foreground">
+                {isDragActive ? 'Drop files here...' : 'Drag & drop files or click to browse'}
+              </p>
             </div>
             {files.length > 0 && (
               <div className="space-y-2">
@@ -136,7 +152,9 @@ export function NewApplicationPage() {
                       <span className="text-sm">{f.name}</span>
                       <span className="text-xs text-muted-foreground">({(f.size / 1024).toFixed(0)} KB)</span>
                     </div>
-                    <button onClick={() => setFiles(files.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4 text-red-500" /></button>
+                    <button onClick={() => setFiles(files.filter((_, j) => j !== i))}>
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </button>
                   </div>
                 ))}
               </div>

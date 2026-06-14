@@ -1,6 +1,3 @@
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-export const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
-
 export const SOURCES = [
   { value: 'GEF', label: 'Global Environment Facility' },
   { value: 'GCF', label: 'Green Climate Fund' },
@@ -28,4 +25,10 @@ export const APPLICATION_STATUSES = [
 ] as const
 
 export const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
-export const ALLOWED_FILE_TYPES = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png']
+export const ALLOWED_FILE_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'image/jpeg',
+  'image/png',
+]

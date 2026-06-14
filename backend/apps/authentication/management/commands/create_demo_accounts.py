@@ -7,7 +7,7 @@ class Command(BaseCommand):
     help = "Create demo admin and client accounts for development"
 
     def handle(self, *args, **options):
-        from apps.authentication.models import User, Profile
+        from apps.authentication.models import Profile, User
 
         demo_accounts = [
             {
@@ -31,20 +31,30 @@ class Command(BaseCommand):
 
         for account in demo_accounts:
             email = account["email"]
-            if User.objects.filter(email=email).exists():
-                self.stdout.write(f"  [skip] {email} already exists")
-                continue
 
             with transaction.atomic():
-                user = User.objects.create_user(
+                user, created = User.objects.get_or_create(
                     email=email,
-                    password=account["password"],
-                    role=account["role"],
-                    is_staff=account.get("is_staff", False),
-                    is_superuser=account.get("is_superuser", False),
-                    is_email_verified=True,
-                    is_active=True,
+                    defaults={
+                        "role": account["role"],
+                        "is_staff": account.get("is_staff", False),
+                        "is_superuser": account.get("is_superuser", False),
+                        "is_email_verified": True,
+                        "is_active": True,
+                    },
                 )
+
+                if created:
+                    user.set_password(account["password"])
+                    user.save(update_fields=["password"])
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"  [created] {email} / {account['password']}"
+                        )
+                    )
+                else:
+                    self.stdout.write(f"  [skip]    {email} already exists")
+
                 Profile.objects.get_or_create(
                     user=user,
                     defaults={
@@ -52,9 +62,6 @@ class Command(BaseCommand):
                         "last_name": account.get("last_name", ""),
                         "company": account.get("company", ""),
                     },
-                )
-                self.stdout.write(
-                    self.style.SUCCESS(f"  [created] {email} / {account['password']}")
                 )
 
         self.stdout.write(self.style.SUCCESS("Demo accounts ready."))

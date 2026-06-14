@@ -28,12 +28,10 @@ class RegisterView(APIView):
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
         services.register_user(
             email=serializer.validated_data["email"],
             password=serializer.validated_data["password"],
         )
-
         return Response(
             {"success": True, "message": "Registration successful. Please verify your email."},
             status=status.HTTP_201_CREATED,
@@ -47,12 +45,10 @@ class LoginView(APIView):
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
         result = services.login_user(
             email=serializer.validated_data["email"],
             password=serializer.validated_data["password"],
         )
-
         response = Response(
             {
                 "success": True,
@@ -61,18 +57,15 @@ class LoginView(APIView):
             },
             status=status.HTTP_200_OK,
         )
-
-        # Set refresh token in httpOnly cookie
         response.set_cookie(
             key="refresh_token",
             value=result["refresh"],
             httponly=True,
             secure=request.is_secure(),
             samesite="Strict",
-            max_age=7 * 24 * 60 * 60,  # 7 days
+            max_age=7 * 24 * 60 * 60,
             path="/api/v1/auth/token/refresh/",
         )
-
         return response
 
 
@@ -88,34 +81,41 @@ class RefreshTokenView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
+        from rest_framework_simplejwt.exceptions import TokenError
         from rest_framework_simplejwt.tokens import RefreshToken
+        from .models import User
 
         try:
-            refresh = RefreshToken(refresh_token)
-            access = str(refresh.access_token)
+            old_refresh = RefreshToken(refresh_token)
+            user_id = old_refresh.get("user_id")
+            user = User.objects.get(id=user_id, is_active=True)
 
-            # Rotate refresh token
-            new_refresh = str(refresh)
-            refresh.blacklist()
+            try:
+                old_refresh.blacklist()
+            except AttributeError:
+                pass
+
+            new_refresh = RefreshToken.for_user(user)
+            new_refresh["role"] = user.role
+            new_refresh["email"] = user.email
+            access = str(new_refresh.access_token)
 
             response = Response(
                 {"success": True, "access": access},
                 status=status.HTTP_200_OK,
             )
-
             response.set_cookie(
                 key="refresh_token",
-                value=new_refresh,
+                value=str(new_refresh),
                 httponly=True,
                 secure=request.is_secure(),
                 samesite="Strict",
                 max_age=7 * 24 * 60 * 60,
                 path="/api/v1/auth/token/refresh/",
             )
-
             return response
 
-        except Exception:
+        except (TokenError, User.DoesNotExist):
             return Response(
                 {"success": False, "error": "Invalid or expired refresh token."},
                 status=status.HTTP_401_UNAUTHORIZED,
@@ -128,13 +128,11 @@ class LogoutView(APIView):
         refresh_token = request.COOKIES.get("refresh_token")
         if refresh_token:
             from rest_framework_simplejwt.tokens import RefreshToken
-
             try:
                 token = RefreshToken(refresh_token)
                 token.blacklist()
             except Exception:
                 pass
-
         response = Response(
             {"success": True, "message": "Logged out successfully."},
             status=status.HTTP_200_OK,

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
+import { Eye, EyeOff } from 'lucide-react'
 import api from '@/lib/axios'
 
 const strengthLabels = ['Very Weak', 'Weak', 'Fair', 'Strong', 'Very Strong']
@@ -19,10 +20,11 @@ export function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
-  const navigate = useNavigate()
   const strength = useMemo(() => getStrength(password), [password])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,8 +34,9 @@ export function RegisterPage() {
     try {
       await api.post('/auth/register/', { email, password, password_confirm: passwordConfirm })
       setSuccess(true)
-    } catch (err: any) {
-      setError(err.response?.data?.error?.message || 'Registration failed.')
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { error?: { message?: string } } } }
+      setError(ax.response?.data?.error?.message || 'Registration failed.')
     } finally { setLoading(false) }
   }
 
@@ -69,34 +72,90 @@ export function RegisterPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-sm font-medium mb-1.5">Email</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
-                className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="you@company.mr"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5">Password</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={8}
-                className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  className="w-full rounded-lg border border-input bg-background px-4 py-2.5 pr-11 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               {password && (
                 <div className="mt-2">
                   <div className="flex gap-1">
-                    {[0,1,2,3,4].map(i => <div key={i} className={`h-1 flex-1 rounded-full ${i <= strength ? strengthColors[strength] : 'bg-gray-200'}`} />)}
+                    {[0, 1, 2, 3, 4].map(i => (
+                      <div
+                        key={i}
+                        className={`h-1 flex-1 rounded-full ${i <= strength ? strengthColors[strength] : 'bg-gray-200'}`}
+                      />
+                    ))}
                   </div>
-                  <p className={`text-xs mt-1 ${strength >= 3 ? 'text-emerald-600' : 'text-muted-foreground'}`}>{strengthLabels[strength]}</p>
+                  <p className={`text-xs mt-1 ${strength >= 3 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                    {strengthLabels[strength]}
+                  </p>
                 </div>
               )}
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5">Confirm Password</label>
-              <input type="password" value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)} required
-                className="w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+              <div className="relative">
+                <input
+                  type={showPasswordConfirm ? 'text' : 'password'}
+                  value={passwordConfirm}
+                  onChange={e => setPasswordConfirm(e.target.value)}
+                  required
+                  className="w-full rounded-lg border border-input bg-background px-4 py-2.5 pr-11 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordConfirm(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={showPasswordConfirm ? 'Hide confirm password' : 'Show confirm password'}
+                >
+                  {showPasswordConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {passwordConfirm && password !== passwordConfirm && (
+                <p className="text-xs text-red-500 mt-1">Passwords do not match.</p>
+              )}
+              {passwordConfirm && password === passwordConfirm && password.length >= 8 && (
+                <p className="text-xs text-emerald-600 mt-1">Passwords match.</p>
+              )}
             </div>
-            <button type="submit" disabled={loading}
-              className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-lg hover:bg-primary/90 disabled:opacity-50 transition-all">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-lg hover:bg-primary/90 disabled:opacity-50 transition-all"
+            >
               {loading ? 'Creating account...' : 'Create Account'}
             </button>
           </form>
           <p className="text-center text-sm text-muted-foreground">
-            Already have an account? <Link to="/login" className="font-medium text-primary hover:underline">Sign in</Link>
+            Already have an account?{' '}
+            <Link to="/login" className="font-medium text-primary hover:underline">Sign in</Link>
           </p>
         </div>
       </div>

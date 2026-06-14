@@ -9,13 +9,10 @@ from . import services
 from .models import ScrapingJob
 
 
-@shared_task(bind=True)
+@shared_task(bind=True, time_limit=600, soft_time_limit=540)
 def run_scraping_job(self, source: str, max_pages: int = 5, user_id: int = None):
     job = ScrapingJob.objects.create(
-        source=source,
-        status="running",
-        started_at=timezone.now(),
-        triggered_by_id=user_id,
+        source=source, status="running", started_at=timezone.now(), triggered_by_id=user_id,
     )
     channel_layer = get_channel_layer()
 
@@ -29,28 +26,33 @@ def run_scraping_job(self, source: str, max_pages: int = 5, user_id: int = None)
                 {
                     "type": "scraping_update",
                     "data": {
-                        "job_id": job.id,
-                        "source": source,
-                        "pages_scraped": current_page,
-                        "total_pages": total_pages,
-                        "projects_found": found,
-                        "status": "running",
+                        "job_id": job.id, "source": source, "pages_scraped": current_page,
+                        "total_pages": total_pages, "projects_found": found, "status": "running",
                     },
                 },
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
     try:
         projects = services.run_scraper(source=source, max_pages=max_pages, progress_callback=progress_callback)
         result = services.save_projects(projects=projects, job=job)
-
         job.status = "completed"
         job.projects_found = result["created"]
         job.finished_at = timezone.now()
         job.save()
 
-        # Notify admin
+        if channel_layer:
+            try:
+                async_to_sync(channel_layer.group_send)(
+                    "scraping_progress",
+                    {"type": "scraping_update", "data": {
+                        "job_id": job.id, "source": source, "pages_scraped": job.pages_scraped,
+                        "total_pages": max_pages, "projects_found": result["created"], "status": "completed"}},
+                )
+            except Exception:  # noqa: BLE001
+                pass
+
         if user_id:
             from apps.authentication.models import User
             from apps.notifications.services import create_notification
@@ -59,13 +61,11 @@ def run_scraping_job(self, source: str, max_pages: int = 5, user_id: int = None)
             create_notification(
                 user=user,
                 message=f"Scraping {source} completed: {result['created']} new, {result['duplicates']} duplicates.",
-                notification_type="scraping_complete",
-                category="scraping",
+                notification_type="scraping_complete", category="scraping",
             )
-
         return {"job_id": job.id, **result}
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         job.status = "failed"
         job.error_log = str(e)
         job.finished_at = timezone.now()

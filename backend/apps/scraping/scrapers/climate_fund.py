@@ -1,9 +1,18 @@
-"""Climate Fund scraper."""
+"""Climate Funds Update scraper.
+
+NOTE: ``/data-dashboard/`` renders its data through embedded Tableau
+visualizations (iframes), not as HTML cards or tables — there is nothing
+to scrape from the DOM. The underlying data is published once a year as an
+Excel workbook (the link and year change annually), and it consists of
+aggregate fund-level statistics (pledges, deposits, approvals) — not
+individual funding opportunities that a company can apply to.
+
+This source does not fit the per-opportunity model. The scraper is a safe
+no-op. If you want CFU fund-level data ingested, use the existing Excel
+import flow rather than this scraper.
+"""
 
 import logging
-
-import requests
-from bs4 import BeautifulSoup
 
 from .base import BaseScraper
 
@@ -15,30 +24,11 @@ class ClimateFundScraper(BaseScraper):
     BASE_URL = "https://climatefundsupdate.org/data-dashboard/"
 
     def scrape(self, max_pages=5, progress_callback=None):
-        projects = []
-        try:
-            resp = requests.get(self.BASE_URL, timeout=30)
-            soup = BeautifulSoup(resp.content, "html.parser")
-            items = soup.select("table tbody tr, .project-item, article")
-            for item in items[: max_pages * 10]:
-                title_el = item.select_one("td:first-child, h3, .title")
-                if not title_el:
-                    continue
-                title = title_el.get_text(strip=True)
-                link = item.select_one("a")
-                url = link.get("href", "") if link else ""
-                project = {
-                    "title": title,
-                    "url": url,
-                    "source": "CLIMATE_FUND",
-                    "description": item.get_text(strip=True)[:500],
-                }
-                project["sector"] = self.classify_sector(project["description"])
-                project["hash"] = self.generate_hash(title, url, "")
-                project["completeness_score"] = self.calculate_completeness_score(project)
-                projects.append(project)
-            if progress_callback:
-                progress_callback(1, 1, len(projects))
-        except Exception as e:
-            logger.error(f"Climate Fund scraping error: {e}")
-        return projects
+        logger.warning(
+            "Climate Funds Update: dashboard is a Tableau embed with no "
+            "scrapable per-opportunity data. Skipping. Use an Excel import "
+            "flow for CFU fund-level statistics instead."
+        )
+        if progress_callback:
+            progress_callback(1, 1, 0)
+        return []

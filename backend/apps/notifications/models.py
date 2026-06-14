@@ -45,6 +45,9 @@ class Notification(TimestampMixin):
     class Meta:
         db_table = "notifications"
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "is_read", "is_archived"], name="notif_user_read_arch_idx"),
+        ]
 
     def __str__(self):
         return f"{self.notification_type}: {self.message[:50]}"

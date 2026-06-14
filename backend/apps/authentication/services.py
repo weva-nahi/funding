@@ -6,6 +6,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core.cache import cache
+from django.db import transaction
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -21,21 +22,45 @@ def register_user(*, email: str, password: str, role: str = "client", **kwargs) 
     if User.objects.filter(email__iexact=email).exists():
         raise ApplicationError("An account with this email already exists.")
 
-    user = User.objects.create_user(email=email, password=password, role=role)
-    Profile.objects.create(
-        user=user,
-        first_name=kwargs.get("first_name", ""),
-        last_name=kwargs.get("last_name", ""),
-        company=kwargs.get("company_name", ""),
-    )
+    # Wrap user + profile creation in a transaction so any failure is atomic.
+    # Organization creation is attempted inside but its failure is caught and
+    # logged — it must NOT roll back the user registration itself.
+    with transaction.atomic():
+        user = User.objects.create_user(email=email, password=password, role=role)
+        Profile.objects.create(
+            user=user,
+            first_name=kwargs.get("first_name", ""),
+            last_name=kwargs.get("last_name", ""),
+            company=kwargs.get("company_name", ""),
+        )
+
+    # Organization creation happens outside the user transaction so a failure
+    # there does not leave an orphaned user record.
+    org_name = kwargs.get("company_name") or kwargs.get("organization_name")
+    if org_name:
+        try:
+            from apps.organizations.services import create_organization
+
+            create_organization(
+                user=user,
+                name=org_name,
+                registration_number=kwargs.get("registration_number") or None,
+                industry=kwargs.get("industry", ""),
+                size=kwargs.get("size", ""),
+                location=kwargs.get("location", ""),
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Organization creation failed for %s: %s", email, exc)
 
     token = _generate_verification_token(user)
     verify_url = f"{settings.FRONTEND_URL}/verify-email/{token}"
 
+    # Log the URL to the console so developers can verify email in development
     logger.warning(
         "\n" + "=" * 60 + "\n"
-        f"EMAIL VERIFICATION LINK FOR: {email}\n"
-        f"{verify_url}\n" + "=" * 60
+        "EMAIL VERIFICATION LINK FOR: %s\n%s\n" + "=" * 60,
+        email,
+        verify_url,
     )
 
     send_verification_email.delay(user.id, token)
@@ -62,7 +87,9 @@ def login_user(*, email: str, password: str) -> dict:
 
     if user.locked_until and user.locked_until > timezone.now():
         remaining = (user.locked_until - timezone.now()).seconds // 60 + 1
-        raise AccountLockedError(f"Account locked. Try again in {remaining} minutes.")
+        raise AccountLockedError(
+            f"Account locked. Try again in {remaining} minutes."
+        )
 
     if not user.check_password(password):
         _handle_failed_login(user)
@@ -79,10 +106,15 @@ def login_user(*, email: str, password: str) -> dict:
             )
         raise ApplicationError("Please verify your email before logging in.")
 
+    # Reset failed attempts after a successful login
     if user.failed_login_attempts > 0:
         user.failed_login_attempts = 0
         user.locked_until = None
-        user.save(update_fields=["failed_login_attempts", "locked_until"])
+        user.last_login = timezone.now()
+        user.save(update_fields=["failed_login_attempts", "locked_until", "last_login"])
+    else:
+        user.last_login = timezone.now()
+        user.save(update_fields=["last_login"])
 
     refresh = RefreshToken.for_user(user)
     refresh["role"] = user.role
@@ -103,13 +135,14 @@ def request_password_reset(*, email: str) -> None:
 
         logger.warning(
             "\n" + "=" * 60 + "\n"
-            f"PASSWORD RESET LINK FOR: {email}\n"
-            f"{reset_url}\n" + "=" * 60
+            "PASSWORD RESET LINK FOR: %s\n%s\n" + "=" * 60,
+            email,
+            reset_url,
         )
 
         send_reset_password_email.delay(user.id, token)
     except User.DoesNotExist:
-        pass
+        pass  # Silent fail — never reveal whether an email exists
 
 
 def reset_password(*, token: str, new_password: str) -> None:
@@ -132,14 +165,27 @@ def change_password(*, user: User, old_password: str, new_password: str) -> None
 
 def update_profile(*, user: User, **kwargs) -> Profile:
     profile = user.profile
+    allowed = {
+        "first_name",
+        "last_name",
+        "company",
+        "phone",
+        "sector",
+        "notify_application_status",
+        "notify_new_opportunities",
+        "notify_consulting_response",
+        "notify_deadline_reminder",
+        "notify_system_announcements",
+        "notify_email_enabled",
+    }
     for field, value in kwargs.items():
-        if hasattr(profile, field):
+        if field in allowed and hasattr(profile, field):
             setattr(profile, field, value)
     profile.save()
     return profile
 
 
-def _handle_failed_login(user):
+def _handle_failed_login(user: User) -> None:
     user.failed_login_attempts += 1
     if user.failed_login_attempts >= settings.ACCOUNT_LOCKOUT_ATTEMPTS:
         user.locked_until = timezone.now() + timedelta(
@@ -148,13 +194,17 @@ def _handle_failed_login(user):
     user.save(update_fields=["failed_login_attempts", "locked_until"])
 
 
-def _generate_verification_token(user):
+def _generate_verification_token(user: User) -> str:
     token = uuid.uuid4().hex
-    cache.set(f"email_verify:{token}", user.id, timeout=86400)
+    cache.set(f"email_verify:{token}", user.id, timeout=86400)  # 24 hours
     return token
 
 
-def _generate_reset_token(user):
+def _generate_reset_token(user: User) -> str:
     token = uuid.uuid4().hex
-    cache.set(f"password_reset:{token}", user.id, timeout=3600)
+    cache.set(
+        f"password_reset:{token}",
+        user.id,
+        timeout=settings.SIGNED_URL_EXPIRY_SECONDS,
+    )
     return token

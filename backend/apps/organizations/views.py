@@ -1,18 +1,23 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from common.exceptions import NotFoundError
 
 from . import selectors, services
 from .serializers import OrganizationSerializer
 
 
 class OrganizationView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(responses={200: OrganizationSerializer}, tags=["Organizations"])
     def get(self, request):
         org = selectors.get_organization_by_user(user=request.user)
         if not org:
-            return Response({"detail": "No organization found."}, status=404)
+            raise NotFoundError("No organization found.")
         return Response(OrganizationSerializer(org).data)
 
     @extend_schema(request=OrganizationSerializer, responses={201: OrganizationSerializer}, tags=["Organizations"])
@@ -26,6 +31,8 @@ class OrganizationView(APIView):
     def patch(self, request):
         org = selectors.get_organization_by_user(user=request.user)
         if not org:
-            return Response({"detail": "No organization found."}, status=404)
-        org = services.update_organization(organization=org, **request.data)
+            raise NotFoundError("No organization found.")
+        serializer = OrganizationSerializer(org, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        org = services.update_organization(organization=org, **serializer.validated_data)
         return Response(OrganizationSerializer(org).data)

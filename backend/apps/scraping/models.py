@@ -54,3 +54,6 @@ class ScrapingAlert(TimestampMixin):
     class Meta:
         db_table = "scraping_alerts"
         ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Alert #{self.id} ({self.priority}/{self.status})"
