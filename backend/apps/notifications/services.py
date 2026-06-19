@@ -5,8 +5,47 @@ from channels.layers import get_channel_layer
 
 from .models import Notification
 
+_PREFERENCE_MAP = {
+    "application_status": "notify_application_status",
+    "new_opportunity": "notify_new_opportunities",
+    "consulting_response": "notify_consulting_response",
+    "deadline_reminder": "notify_deadline_reminder",
+    "system": "notify_system_announcements",
+}
+
 
 def create_notification(*, user, message, notification_type, category="system", priority="medium", link=""):
+    # Check the user's opt-out preference for this notification type.
+    pref_field = _PREFERENCE_MAP.get(notification_type)
+    if pref_field and hasattr(user, "profile"):
+        if not getattr(user.profile, pref_field, True):
+            return None
+
+    # For users on daily digest: store the message in their pending_digest
+    # field instead of creating an in-app notification immediately.
+    # We still create the Notification record so the history is preserved,
+    # but we skip the realtime push and email until the daily task runs.
+    if (
+        hasattr(user, "profile")
+        and getattr(user.profile, "notify_frequency", "immediate") == "daily"
+        and notification_type != "scraping_complete"  # always immediate for admins
+    ):
+        notification = Notification.objects.create(
+            user=user,
+            message=message,
+            notification_type=notification_type,
+            category=category,
+            priority=priority,
+            link=link,
+        )
+        # Queue for daily digest email
+        profile = user.profile
+        pending = list(profile.pending_digest or [])
+        pending.append(message)
+        profile.pending_digest = pending
+        profile.save(update_fields=["pending_digest"])
+        return notification
+
     notification = Notification.objects.create(
         user=user,
         message=message,
@@ -51,4 +90,4 @@ def _send_realtime(notification):
             },
         )
     except Exception:
-        pass  # Don't fail if WebSocket is unavailable
+        pass

@@ -1,121 +1,81 @@
-.PHONY: help up up-build down restart logs logs-be logs-worker logs-beat ps \
-        migrate makemigrations collect createsuperuser demo shell-be shell-fe \
-        db-shell redis-cli test test-be test-fe lint format scrape \
-        deadline-reminders health clean
+.PHONY: help up up-build down migrate makemigrations shell-be shell-db \
+        test test-be test-fe logs logs-be demo collectstatic createsuperuser \
+        scrape lint restart ps
 
-# ─── Colors ──────────────────────────────────────────────────────────────────
-CYAN  := \033[36m
-RESET := \033[0m
+help:
+	@echo "Richat Funding Tracker — developer commands"
+	@echo ""
+	@echo "  make up-build        Build images and start all services (detached)"
+	@echo "  make up              Start all services (detached)"
+	@echo "  make down            Stop and remove all containers"
+	@echo "  make restart         Restart all services"
+	@echo "  make ps              Show running containers"
+	@echo "  make migrate         Apply Django migrations"
+	@echo "  make makemigrations  Create new Django migrations"
+	@echo "  make collectstatic   Collect static files"
+	@echo "  make createsuperuser Create a Django superuser"
+	@echo "  make demo            (Re)create the two demo accounts"
+	@echo "  make shell-be        Open a Django shell"
+	@echo "  make shell-db        Open a psql shell"
+	@echo "  make test            Run backend + frontend tests"
+	@echo "  make test-be         Run backend tests (pytest)"
+	@echo "  make test-fe         Run frontend tests (vitest)"
+	@echo "  make logs            Tail all logs"
+	@echo "  make logs-be         Tail backend logs"
+	@echo "  make lint            Run flake8 on the backend"
 
-help: ## Show this help message
-	@echo ""
-	@echo "  $(CYAN)Richat Funding Tracker — Dev Commands$(RESET)"
-	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
-		awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-22s$(RESET) %s\n", $$1, $$2}'
-	@echo ""
+up-build:
+	docker compose up --build -d
 
-# ─── Docker Compose ───────────────────────────────────────────────────────────
-up: ## Start all services (detached)
+up:
 	docker compose up -d
 
-up-build: ## Build images then start all services
-	docker compose up -d --build
-
-down: ## Stop all services
+down:
 	docker compose down
 
-restart: ## Restart all services
+restart:
 	docker compose restart
 
-restart-be: ## Restart backend + celery only
-	docker compose restart backend celery_worker celery_beat
-
-logs: ## Follow all service logs
-	docker compose logs -f
-
-logs-be: ## Follow backend logs only
-	docker compose logs -f backend
-
-logs-worker: ## Follow celery worker logs
-	docker compose logs -f celery_worker
-
-logs-beat: ## Follow celery beat logs
-	docker compose logs -f celery_beat
-
-ps: ## Show service status
+ps:
 	docker compose ps
 
-# ─── Django Management ────────────────────────────────────────────────────────
-migrate: ## Run database migrations
-	docker compose exec backend python manage.py migrate --noinput
+migrate:
+	docker compose exec backend python manage.py migrate
 
-makemigrations: ## Create new migrations
+makemigrations:
 	docker compose exec backend python manage.py makemigrations
 
-collect: ## Collect static files
+collectstatic:
 	docker compose exec backend python manage.py collectstatic --noinput
 
-createsuperuser: ## Create a Django superuser interactively
+createsuperuser:
 	docker compose exec backend python manage.py createsuperuser
 
-demo: ## Create demo admin + client accounts (idempotent)
+demo:
 	docker compose exec backend python manage.py create_demo_accounts
 
-shell-be: ## Open Django interactive shell
+shell-be:
 	docker compose exec backend python manage.py shell
 
-shell-fe: ## Open frontend container shell
-	docker compose exec frontend sh
+shell-db:
+	docker compose exec db psql -U richat_user -d richat_db
 
-db-shell: ## Open PostgreSQL psql shell
-	docker compose exec db psql \
-		-U $${POSTGRES_USER:-richat_user} \
-		-d $${POSTGRES_DB:-richat_db}
+test: test-be test-fe
 
-redis-cli: ## Open Redis CLI
-	docker compose exec redis redis-cli
+test-be:
+	docker compose exec backend pytest
 
-# ─── Testing ──────────────────────────────────────────────────────────────────
-test: test-be test-fe ## Run all tests (backend + frontend)
-
-test-be: ## Run backend pytest tests
-	docker compose exec backend python -m pytest tests/ -v --tb=short
-
-test-fe: ## Run frontend vitest tests
+test-fe:
 	docker compose exec frontend npm run test
 
-lint: ## Lint backend with flake8
-	docker compose exec backend \
-		flake8 . --max-line-length=120 --exclude=migrations,venv,.venv
+logs:
+	docker compose logs -f
 
-format: ## Format backend with black
-	docker compose exec backend \
-		black . --line-length=120 --exclude=migrations
+logs-be:
+	docker compose logs -f backend
 
-# ─── Celery Tasks ─────────────────────────────────────────────────────────────
-scrape: ## Queue a GEF scraping job (2 pages for speed)
-	docker compose exec backend python manage.py shell -c "\
-from apps.scraping.tasks import run_scraping_job; \
-run_scraping_job.delay('gef', max_pages=2); \
-print('Scraping job queued.')"
+lint:
+	docker compose exec backend flake8 .
 
-deadline-reminders: ## Manually trigger deadline reminder task
-	docker compose exec backend python manage.py shell -c "\
-from apps.notifications.tasks import send_deadline_reminders; \
-result = send_deadline_reminders(); \
-print('Reminders sent:', result)"
-
-# ─── Maintenance ──────────────────────────────────────────────────────────────
-health: ## Check API and frontend health endpoints
-	@curl -sf http://localhost:8000/api/v1/health/ \
-		&& echo "  Backend : OK" \
-		|| echo "  Backend : FAIL"
-	@curl -sf http://localhost:5173/ > /dev/null \
-		&& echo "  Frontend: OK" \
-		|| echo "  Frontend: FAIL"
-
-clean: ## Remove stopped containers, dangling images, unused volumes
-	docker compose down --remove-orphans
-	docker image prune -f
-	docker volume prune -f
+scrape:
+	docker compose exec backend python manage.py shell -c "from apps.scraping.tasks import run_scraping_job; run_scraping_job.delay('world_bank', 5)"

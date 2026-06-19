@@ -1,18 +1,31 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import api from '@/lib/axios'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { formatDate, daysUntil } from '@/utils/formatDate'
-import { Globe, Calendar, DollarSign, ArrowLeft, ExternalLink, FileText } from 'lucide-react'
+import { Globe, Calendar, DollarSign, ArrowLeft, ExternalLink, FileText, Bookmark, BookmarkCheck } from 'lucide-react'
 import type { Opportunity } from '@/types'
 
 export function OpportunityDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
   const { data: opp, isLoading, isError } = useQuery<Opportunity>({
     queryKey: ['opportunity', id],
     queryFn: () => api.get(`/opportunities/${id}/`).then(r => r.data),
+  })
+
+  const saveMutation = useMutation({
+    mutationFn: (saving: boolean) =>
+      saving
+        ? api.post(`/opportunities/${id}/save/`)
+        : api.delete(`/opportunities/${id}/save/`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['opportunity', id] })
+      queryClient.invalidateQueries({ queryKey: ['opportunities'] })
+      queryClient.invalidateQueries({ queryKey: ['opportunities-saved'] })
+    },
   })
 
   if (isLoading) return (
@@ -103,6 +116,21 @@ export function OpportunityDetailPage() {
                 <FileText className="h-4 w-4" /> Apply Now
               </Link>
             )}
+            {/* Save for later button */}
+            <button
+              onClick={() => saveMutation.mutate(!opp.is_saved)}
+              disabled={saveMutation.isPending}
+              className={`inline-flex items-center gap-2 rounded-lg border px-6 py-2.5 text-sm font-medium transition-colors ${
+                opp.is_saved
+                  ? 'border-primary bg-primary/5 text-primary hover:bg-primary/10'
+                  : 'hover:bg-muted'
+              }`}
+            >
+              {opp.is_saved
+                ? <><BookmarkCheck className="h-4 w-4" /> Saved</>
+                : <><Bookmark className="h-4 w-4" /> Save for Later</>
+              }
+            </button>
             {opp.url && (
               <a href={opp.url} target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg border px-6 py-2.5 text-sm font-medium hover:bg-muted transition-colors">

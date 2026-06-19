@@ -92,11 +92,10 @@ DATABASES = {
         "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "richat_password_change_me"),
         "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        "CONN_MAX_AGE": 60,
     }
 }
 
-# Cache (Redis). Email-verification and password-reset tokens live here and MUST be
-# shared across Daphne/Celery processes, so LocMemCache is never used.
 REDIS_CACHE_URL = os.environ.get("REDIS_CACHE_URL", "redis://redis:6379/4")
 CACHES = {
     "default": {
@@ -173,6 +172,14 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.notifications.tasks.send_deadline_reminders",
         "schedule": crontab(hour=7, minute=0),
     },
+    "archive-expired-opportunities": {
+        "task": "apps.opportunities.tasks.archive_expired_opportunities",
+        "schedule": crontab(hour=1, minute=0),
+    },
+    "send-daily-digests": {
+        "task": "apps.notifications.tasks.send_daily_digests",
+        "schedule": crontab(hour=8, minute=0),
+    },
 }
 
 SPECTACULAR_SETTINGS = {
@@ -182,17 +189,17 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
     "TAGS": [
-        {"name": "Authentication", "description": "User authentication and registration"},
-        {"name": "Organizations", "description": "Organization management"},
-        {"name": "Opportunities", "description": "Funding opportunities"},
-        {"name": "Applications", "description": "Funding applications"},
-        {"name": "Documents", "description": "Document management"},
-        {"name": "Notifications", "description": "User notifications"},
-        {"name": "Scraping", "description": "Data scraping management"},
-        {"name": "Consulting", "description": "Consulting requests"},
-        {"name": "Analytics", "description": "Platform analytics"},
-        {"name": "Audit", "description": "Audit logs"},
-        {"name": "System", "description": "Health and system endpoints"},
+        {"name": "Authentication"},
+        {"name": "Organizations"},
+        {"name": "Opportunities"},
+        {"name": "Applications"},
+        {"name": "Documents"},
+        {"name": "Notifications"},
+        {"name": "Scraping"},
+        {"name": "Consulting"},
+        {"name": "Analytics"},
+        {"name": "Audit"},
+        {"name": "System"},
     ],
 }
 
@@ -227,7 +234,6 @@ ACCOUNT_LOCKOUT_DURATION_MINUTES = 30
 
 SIGNED_URL_EXPIRY_SECONDS = int(os.environ.get("SIGNED_URL_EXPIRY_SECONDS", 3600))
 
-# Business rule constants (no more magic numbers)
 REJECTION_REASON_MIN_LENGTH = 20
 PROCESSING_TIME_SAMPLE_LIMIT = 500
 DEADLINE_REMINDER_DAYS = [7, 1]

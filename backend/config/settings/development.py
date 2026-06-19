@@ -8,8 +8,9 @@ ALLOWED_HOSTS = list(  # noqa: F405
     {*ALLOWED_HOSTS, "localhost", "127.0.0.1", "0.0.0.0", "backend", "[::1]"}  # noqa: F405
 )
 
+# Email — reads from .env; falls back to SMTP (not console) so you notice misconfiguration
 EMAIL_BACKEND = os.environ.get(
-    "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
+    "EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend"
 )
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))

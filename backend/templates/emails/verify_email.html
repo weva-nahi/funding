@@ -1,9 +1,9 @@
 {% extends "emails/base.html" %}
 {% block content %}
-<h2>Welcome to Richat Funding Tracker!</h2>
-<p>Hi {{ user.email }},</p>
-<p>Thank you for registering. Please verify your email address to activate your account.</p>
-<a href="{{ verify_url }}" class="btn">Verify Email</a>
-<p>Or copy this link: <br><small>{{ verify_url }}</small></p>
-<p>This link expires in 24 hours.</p>
+<h2>Bienvenue sur Richat Funding Tracker !</h2>
+<p>Bonjour {{ user.email }},</p>
+<p>Merci pour votre inscription. Veuillez vérifier votre adresse e-mail pour activer votre compte.</p>
+<a href="{{ verify_url }}" class="btn">Vérifier mon e-mail</a>
+<p>Ou copiez ce lien : <br><small>{{ verify_url }}</small></p>
+<p>Ce lien expire dans 24 heures.</p>
 {% endblock %}

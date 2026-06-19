@@ -1,12 +1,12 @@
 {% extends "emails/base.html" %}
 {% block content %}
-<h2>Application Approved! 🎉</h2>
-<p>Hi {{ user.email }},</p>
-<p>Your application for <strong>{{ opportunity.title }}</strong> has been approved.</p>
+<h2>Candidature approuvée ! 🎉</h2>
+<p>Bonjour {{ user.email }},</p>
+<p>Votre candidature pour <strong>{{ opportunity.title }}</strong> a été approuvée.</p>
 {% if application.admin_comment %}
 <div style="background: #f0fdf4; border-left: 4px solid #16a34a; padding: 12px 16px; margin: 16px 0;">
-    <strong>Admin Comment:</strong><br>{{ application.admin_comment }}
+    <strong>Commentaire de l'administrateur :</strong><br>{{ application.admin_comment }}
 </div>
 {% endif %}
-<a href="{{ frontend_url }}/applications/{{ application.id }}" class="btn">View Application</a>
+<a href="{{ frontend_url }}/applications/{{ application.id }}" class="btn">Voir ma candidature</a>
 {% endblock %}

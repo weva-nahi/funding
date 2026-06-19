@@ -1,28 +1,4 @@
-"""OECD scraper — OECD global search, filtered to Mauritania.
-
-The OECD search page is a JavaScript single-page app. The results are NOT
-in the served HTML — they are injected client-side. (Verified: a plain HTTP
-GET returns only the page shell — Topics/Countries menus — and zero result
-items.) This source genuinely requires a rendered browser.
-
-We render with headless Chromium (already installed in the backend image for
-Selenium) and parse the verified DOM structure captured from the live page:
-
-    article.search-result-list-item
-      .search-result-list-item__title a        -> title + link
-      .search-result-list-item__meta
-        .search-result-list-item__tag          -> content type
-        .search-result-list-item__date         -> publication date
-      .search-result-list-item__snippet        -> description
-
-Filtered to Mauritania via ``facetTags=oecd-countries:mrt``.
-
-NOTE: OECD publishes reports / datasets / country notes, not
-application-based funding opportunities, so these ingest as reference items.
-
-If Selenium/Chromium is unavailable the scraper logs and returns [] without
-crashing the job.
-"""
+"""OECD scraper — OECD global search, filtered to Mauritania."""
 
 import logging
 
@@ -37,7 +13,7 @@ logger = logging.getLogger(__name__)
 class OECDScraper(BaseScraper):
     SOURCE_NAME = "OECD"
     BASE_URL = "https://www.oecd.org/en/search.html"
-    COUNTRY_FACET = "oecd-countries:mrt"  # Mauritania. Set to None for all countries.
+    COUNTRY_FACET = "oecd-countries:mrt"
 
     def _setup_driver(self):
         from selenium import webdriver
@@ -81,12 +57,13 @@ class OECDScraper(BaseScraper):
 
                 try:
                     driver.get(url)
-                    WebDriverWait(driver, 20).until(
+                    # Increased from 20s to 45s — OECD can be slow.
+                    WebDriverWait(driver, 45).until(
                         EC.presence_of_element_located(
                             (By.CSS_SELECTOR, "article.search-result-list-item")
                         )
                     )
-                except Exception:  # noqa: BLE001 — timeout or no results rendered
+                except Exception:  # noqa: BLE001
                     logger.info(
                         f"OECD: no results rendered on page {page}, stopping."
                     )
@@ -114,14 +91,10 @@ class OECDScraper(BaseScraper):
                     if meta:
                         tag = meta.select_one(".search-result-list-item__tag")
                         content_type = tag.get_text(strip=True) if tag else ""
-                        date_el = meta.select_one(
-                            ".search-result-list-item__date"
-                        )
+                        date_el = meta.select_one(".search-result-list-item__date")
                         date_text = date_el.get_text(strip=True) if date_el else ""
 
-                    snippet_el = item.select_one(
-                        ".search-result-list-item__snippet"
-                    )
+                    snippet_el = item.select_one(".search-result-list-item__snippet")
                     snippet = (
                         snippet_el.get_text(" ", strip=True) if snippet_el else ""
                     )
@@ -139,13 +112,9 @@ class OECDScraper(BaseScraper):
                         },
                     }
                     project["sector"] = self.classify_sector(f"{title} {snippet}")
-                    project["funding_type"] = self.classify_funding_type(
-                        f"{title} {snippet}"
-                    )
+                    project["funding_type"] = self.classify_funding_type(f"{title} {snippet}")
                     project["hash"] = self.generate_hash(title, href, "")
-                    project["completeness_score"] = self.calculate_completeness_score(
-                        project
-                    )
+                    project["completeness_score"] = self.calculate_completeness_score(project)
                     projects.append(project)
 
                 if progress_callback:

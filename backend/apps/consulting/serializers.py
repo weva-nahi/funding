@@ -39,5 +39,14 @@ class ConsultingCreateSerializer(serializers.Serializer):
 
 
 class ConsultingRespondSerializer(serializers.Serializer):
-    response = serializers.CharField(min_length=5)
-    action = serializers.ChoiceField(choices=["resolve", "reject"])
+    response = serializers.CharField(min_length=5, required=False, allow_blank=True, default="")
+    action = serializers.ChoiceField(choices=["resolve", "reject", "in_progress"])
+
+    def validate(self, data):
+        # in_progress is a status transition that doesn't require a written
+        # response; resolve/reject do.
+        if data["action"] in ("resolve", "reject") and not (data.get("response") or "").strip():
+            raise serializers.ValidationError(
+                {"response": "A response message is required to resolve or reject."}
+            )
+        return data

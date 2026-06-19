@@ -2,11 +2,43 @@
 
 import hashlib
 import logging
+import random
 import re
 import time
 from abc import ABC, abstractmethod
 
 logger = logging.getLogger(__name__)
+
+# A pool of realistic browser User-Agent strings used to rotate on each
+# request. GEF and some other sources block the generic "requests/2.x" UA;
+# rotating through common browser UAs sidesteps that block without requiring
+# a real browser.
+_USER_AGENTS = [
+    (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/123.0.0.0 Safari/537.36"
+    ),
+    (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) "
+        "Gecko/20100101 Firefox/125.0"
+    ),
+    (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) "
+        "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+        "Version/17.4.1 Safari/605.1.15"
+    ),
+    (
+        "Mozilla/5.0 (X11; Linux x86_64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/122.0.0.0 Safari/537.36"
+    ),
+]
 
 
 class BaseScraper(ABC):
@@ -14,13 +46,22 @@ class BaseScraper(ABC):
 
     def __init__(self, delay=2):
         self.delay = delay
-        self.headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (compatible; RichatFundingTracker/1.0; "
-                "+https://richat.mr)"
-            ),
+        self._ua_index = 0
+        self.headers = self._make_headers()
+
+    def _make_headers(self) -> dict:
+        """Build headers with the next User-Agent in the rotation pool."""
+        ua = _USER_AGENTS[self._ua_index % len(_USER_AGENTS)]
+        self._ua_index += 1
+        return {
+            "User-Agent": ua,
             "Accept-Language": "en,fr;q=0.8",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         }
+
+    def rotate_user_agent(self):
+        """Call between requests to cycle to the next User-Agent."""
+        self.headers = self._make_headers()
 
     @abstractmethod
     def scrape(self, max_pages=5, progress_callback=None):
@@ -41,9 +82,6 @@ class BaseScraper(ABC):
 
     # ── Parsing helpers ───────────────────────────────────────────────
     def parse_amount(self, value):
-        """Extract an integer amount from a number or a string such as
-        '700,000', '€ 7 000 000', '16,000,000', '40000000'.
-        Returns None when there is no numeric content."""
         if value is None:
             return None
         if isinstance(value, (int, float)):
@@ -52,8 +90,6 @@ class BaseScraper(ABC):
         return int(digits) if digits else None
 
     def parse_date(self, value):
-        """Return an ISO date string (YYYY-MM-DD) if one can be parsed,
-        otherwise None. Django's DateField accepts the ISO string on save."""
         if not value:
             return None
         match = re.search(r"(\d{4})-(\d{2})-(\d{2})", str(value))
@@ -89,4 +125,8 @@ class BaseScraper(ABC):
         return "grant"
 
     def sleep(self):
-        time.sleep(self.delay)
+        # Add small random jitter (±30%) to make the scraper less detectable.
+        jitter = self.delay * random.uniform(0.7, 1.3)
+        time.sleep(jitter)
+        # Rotate the UA after each page sleep.
+        self.rotate_user_agent()

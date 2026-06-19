@@ -9,7 +9,7 @@ from . import services
 from .models import ScrapingJob
 
 
-@shared_task(bind=True, time_limit=600, soft_time_limit=540)
+@shared_task(bind=True, time_limit=600, soft_time_limit=540, queue="scraping")
 def run_scraping_job(self, source: str, max_pages: int = 5, user_id: int = None):
     job = ScrapingJob.objects.create(
         source=source, status="running", started_at=timezone.now(), triggered_by_id=user_id,

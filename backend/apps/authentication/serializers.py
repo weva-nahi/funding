@@ -53,6 +53,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             "notify_deadline_reminder",
             "notify_system_announcements",
             "notify_email_enabled",
+            "notify_frequency",
         ]
         read_only_fields = ["id", "email", "role"]
 

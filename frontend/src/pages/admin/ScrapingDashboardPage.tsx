@@ -27,7 +27,11 @@ export function ScrapingDashboardPage() {
   })
 
   useEffect(() => {
+    // Connect once — DO NOT disconnect on unmount so the singleton WS
+    // keeps feeding progress updates even if the user navigates away and
+    // comes back. The WS manager itself deduplicates connect calls.
     scrapingWS.connect()
+
     const unsubscribe = scrapingWS.subscribe((raw) => {
       const msg = raw as { type?: string; data?: ScrapingUpdate }
       if (msg.type === 'scraping_update' && msg.data) {
@@ -38,7 +42,12 @@ export function ScrapingDashboardPage() {
         }
       }
     })
-    return () => { unsubscribe(); scrapingWS.disconnect() }
+
+    return () => {
+      unsubscribe()
+      // Intentionally NOT calling scrapingWS.disconnect() here.
+      // The WS stays alive for the entire admin session.
+    }
   }, [queryClient])
 
   const startMutation = useMutation({

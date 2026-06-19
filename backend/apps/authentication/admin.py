@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Profile, User
+from .models import EmailVerificationToken, PasswordResetToken, Profile, User
 
 
 @admin.register(User)
@@ -15,3 +15,19 @@ class UserAdmin(admin.ModelAdmin):
 class ProfileAdmin(admin.ModelAdmin):
     list_display = ["user", "first_name", "last_name", "company", "sector"]
     search_fields = ["first_name", "last_name", "company"]
+
+
+@admin.register(EmailVerificationToken)
+class EmailVerificationTokenAdmin(admin.ModelAdmin):
+    list_display = ["user", "token", "expires_at", "used", "created_at"]
+    list_filter = ["used"]
+    search_fields = ["user__email", "token"]
+    readonly_fields = ["created_at"]
+
+
+@admin.register(PasswordResetToken)
+class PasswordResetTokenAdmin(admin.ModelAdmin):
+    list_display = ["user", "token", "expires_at", "used", "created_at"]
+    list_filter = ["used"]
+    search_fields = ["user__email", "token"]
+    readonly_fields = ["created_at"]

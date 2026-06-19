@@ -12,7 +12,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from common.exceptions import AccountLockedError, ApplicationError
 
-from .models import Profile, User
+from .models import EmailVerificationToken, PasswordResetToken, Profile, User
 from .tasks import send_reset_password_email, send_verification_email
 
 logger = logging.getLogger(__name__)
@@ -22,9 +22,6 @@ def register_user(*, email: str, password: str, role: str = "client", **kwargs) 
     if User.objects.filter(email__iexact=email).exists():
         raise ApplicationError("An account with this email already exists.")
 
-    # Wrap user + profile creation in a transaction so any failure is atomic.
-    # Organization creation is attempted inside but its failure is caught and
-    # logged — it must NOT roll back the user registration itself.
     with transaction.atomic():
         user = User.objects.create_user(email=email, password=password, role=role)
         Profile.objects.create(
@@ -34,13 +31,10 @@ def register_user(*, email: str, password: str, role: str = "client", **kwargs) 
             company=kwargs.get("company_name", ""),
         )
 
-    # Organization creation happens outside the user transaction so a failure
-    # there does not leave an orphaned user record.
     org_name = kwargs.get("company_name") or kwargs.get("organization_name")
     if org_name:
         try:
             from apps.organizations.services import create_organization
-
             create_organization(
                 user=user,
                 name=org_name,
@@ -49,13 +43,12 @@ def register_user(*, email: str, password: str, role: str = "client", **kwargs) 
                 size=kwargs.get("size", ""),
                 location=kwargs.get("location", ""),
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("Organization creation failed for %s: %s", email, exc)
 
     token = _generate_verification_token(user)
     verify_url = f"{settings.FRONTEND_URL}/verify-email/{token}"
 
-    # Log the URL to the console so developers can verify email in development
     logger.warning(
         "\n" + "=" * 60 + "\n"
         "EMAIL VERIFICATION LINK FOR: %s\n%s\n" + "=" * 60,
@@ -68,14 +61,33 @@ def register_user(*, email: str, password: str, role: str = "client", **kwargs) 
 
 
 def verify_email(*, token: str) -> User:
+    """Verify email using DB token (Redis as cache, DB as fallback)."""
+    # Try Redis first (fast path)
     user_id = cache.get(f"email_verify:{token}")
-    if not user_id:
+
+    if user_id:
+        user = User.objects.get(id=user_id)
+        user.is_email_verified = True
+        user.save(update_fields=["is_email_verified"])
+        cache.delete(f"email_verify:{token}")
+        # Mark DB token as used
+        EmailVerificationToken.objects.filter(token=token).update(used=True)
+        return user
+
+    # Fallback: check DB token (handles Redis restart scenario)
+    try:
+        db_token = EmailVerificationToken.objects.select_related("user").get(token=token)
+    except EmailVerificationToken.DoesNotExist:
         raise ApplicationError("Invalid or expired verification link.")
 
-    user = User.objects.get(id=user_id)
+    if not db_token.is_valid():
+        raise ApplicationError("Invalid or expired verification link.")
+
+    user = db_token.user
     user.is_email_verified = True
     user.save(update_fields=["is_email_verified"])
-    cache.delete(f"email_verify:{token}")
+    db_token.used = True
+    db_token.save(update_fields=["used"])
     return user
 
 
@@ -87,9 +99,7 @@ def login_user(*, email: str, password: str) -> dict:
 
     if user.locked_until and user.locked_until > timezone.now():
         remaining = (user.locked_until - timezone.now()).seconds // 60 + 1
-        raise AccountLockedError(
-            f"Account locked. Try again in {remaining} minutes."
-        )
+        raise AccountLockedError(f"Account locked. Try again in {remaining} minutes.")
 
     if not user.check_password(password):
         _handle_failed_login(user)
@@ -106,7 +116,6 @@ def login_user(*, email: str, password: str) -> dict:
             )
         raise ApplicationError("Please verify your email before logging in.")
 
-    # Reset failed attempts after a successful login
     if user.failed_login_attempts > 0:
         user.failed_login_attempts = 0
         user.locked_until = None
@@ -142,18 +151,35 @@ def request_password_reset(*, email: str) -> None:
 
         send_reset_password_email.delay(user.id, token)
     except User.DoesNotExist:
-        pass  # Silent fail — never reveal whether an email exists
+        pass
 
 
 def reset_password(*, token: str, new_password: str) -> None:
+    # Try Redis first
     user_id = cache.get(f"password_reset:{token}")
-    if not user_id:
+
+    if user_id:
+        user = User.objects.get(id=user_id)
+        user.set_password(new_password)
+        user.save(update_fields=["password"])
+        cache.delete(f"password_reset:{token}")
+        PasswordResetToken.objects.filter(token=token).update(used=True)
+        return
+
+    # Fallback: DB token
+    try:
+        db_token = PasswordResetToken.objects.select_related("user").get(token=token)
+    except PasswordResetToken.DoesNotExist:
         raise ApplicationError("Invalid or expired reset link.")
 
-    user = User.objects.get(id=user_id)
+    if not db_token.is_valid():
+        raise ApplicationError("Invalid or expired reset link.")
+
+    user = db_token.user
     user.set_password(new_password)
     user.save(update_fields=["password"])
-    cache.delete(f"password_reset:{token}")
+    db_token.used = True
+    db_token.save(update_fields=["used"])
 
 
 def change_password(*, user: User, old_password: str, new_password: str) -> None:
@@ -177,6 +203,7 @@ def update_profile(*, user: User, **kwargs) -> Profile:
         "notify_deadline_reminder",
         "notify_system_announcements",
         "notify_email_enabled",
+        "notify_frequency",
     }
     for field, value in kwargs.items():
         if field in allowed and hasattr(profile, field):
@@ -196,15 +223,34 @@ def _handle_failed_login(user: User) -> None:
 
 def _generate_verification_token(user: User) -> str:
     token = uuid.uuid4().hex
-    cache.set(f"email_verify:{token}", user.id, timeout=86400)  # 24 hours
+    expires_at = timezone.now() + timedelta(hours=24)
+
+    # Store in Redis (fast lookup)
+    cache.set(f"email_verify:{token}", user.id, timeout=86400)
+
+    # Store in DB (survives Redis restart)
+    EmailVerificationToken.objects.create(
+        user=user,
+        token=token,
+        expires_at=expires_at,
+    )
+
     return token
 
 
 def _generate_reset_token(user: User) -> str:
     token = uuid.uuid4().hex
-    cache.set(
-        f"password_reset:{token}",
-        user.id,
-        timeout=settings.SIGNED_URL_EXPIRY_SECONDS,
+    expiry_seconds = settings.SIGNED_URL_EXPIRY_SECONDS
+    expires_at = timezone.now() + timedelta(seconds=expiry_seconds)
+
+    # Store in Redis
+    cache.set(f"password_reset:{token}", user.id, timeout=expiry_seconds)
+
+    # Store in DB (survives Redis restart)
+    PasswordResetToken.objects.create(
+        user=user,
+        token=token,
+        expires_at=expires_at,
     )
+
     return token

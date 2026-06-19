@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/axios'
-import { CheckCircle, XCircle, AlertTriangle, Clock } from 'lucide-react'
+import { CheckCircle, XCircle, AlertTriangle, Clock, Zap } from 'lucide-react'
 import { formatDate } from '@/utils/formatDate'
 import { formatCurrency } from '@/utils/formatCurrency'
 import type { Paginated, ScrapingAlert } from '@/types'
@@ -21,11 +21,36 @@ export function ScrapingAlertsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['scraping-alerts'] }),
   })
 
+  const bulkPublishMutation = useMutation({
+    mutationFn: () => {
+      const ids = (data?.results ?? []).map(a => a.opportunity?.id).filter(Boolean)
+      return api.post('/opportunities/admin/bulk-publish/', { ids })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scraping-alerts'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-opportunities'] })
+    },
+  })
+
+  const newAlerts = data?.results?.filter(a => a.status === 'new') ?? []
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Scraping Alerts</h1>
-        <p className="text-muted-foreground mt-1">Review recently scraped high-priority opportunities</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Scraping Alerts</h1>
+          <p className="text-muted-foreground mt-1">Review recently scraped high-priority opportunities</p>
+        </div>
+        {newAlerts.length > 0 && (
+          <button
+            onClick={() => bulkPublishMutation.mutate()}
+            disabled={bulkPublishMutation.isPending}
+            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+          >
+            <Zap className="h-4 w-4" />
+            {bulkPublishMutation.isPending ? 'Publishing...' : `Publish All New (${newAlerts.length})`}
+          </button>
+        )}
       </div>
 
       <div className="rounded-xl border bg-white shadow-sm overflow-hidden">

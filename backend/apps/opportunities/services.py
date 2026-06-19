@@ -9,7 +9,7 @@ from django.utils import timezone
 from common.exceptions import ConflictError, InvalidFileError
 from common.utils.hashing import generate_opportunity_hash
 
-from .models import FundingOpportunity
+from .models import FundingOpportunity, SavedOpportunity
 
 logger = logging.getLogger(__name__)
 
@@ -67,11 +67,6 @@ def create_opportunity(*, created_by=None, **kwargs) -> FundingOpportunity:
     if "source" in kwargs:
         kwargs["source"] = _normalize_source(kwargs["source"])
 
-    # Opportunities are deduplicated by a SHA-256 hash of (title, url, amount),
-    # enforced by a UNIQUE constraint on the `hash` column. Creating a second
-    # opportunity with the same triple previously escaped as a raw HTTP 500
-    # IntegrityError. We now detect it up front and, as a race-safe fallback,
-    # convert the database error into a clean HTTP 409 Conflict.
     if FundingOpportunity.objects.filter(hash=kwargs["hash"]).exists():
         raise ConflictError(
             "An opportunity with the same title, URL and amount already exists."
@@ -106,21 +101,39 @@ def publish_opportunity(
     return opportunity
 
 
+def bulk_publish_opportunities(*, ids: list, user=None) -> dict:
+    """Publish many opportunities at once. Returns counts."""
+    now = timezone.now()
+    qs = FundingOpportunity.objects.filter(id__in=ids).exclude(status="published")
+    published = 0
+    for opp in qs:
+        opp.status = "published"
+        opp.published_at = now
+        opp.save(update_fields=["status", "published_at", "updated_at"])
+        published += 1
+    return {"published": published, "requested": len(ids)}
+
+
 def archive_opportunity(*, opportunity: FundingOpportunity) -> FundingOpportunity:
     opportunity.status = "archived"
     opportunity.save(update_fields=["status", "updated_at"])
     return opportunity
 
 
-def import_opportunities_from_xlsx(*, file_obj, created_by=None) -> dict:
-    """
-    Parse an .xlsx file and bulk-create opportunities, skipping duplicates.
+# ─── Save-for-later ───────────────────────────────────────────────────────────
 
-    Key fix: openpyxl returns Python datetime.date or datetime.datetime objects
-    for cells formatted as dates in Excel. These must be converted to ISO date
-    strings before being stored in Django's DateField, otherwise the save
-    raises a TypeError.
-    """
+def save_opportunity(*, user, opportunity: FundingOpportunity) -> SavedOpportunity:
+    obj, _created = SavedOpportunity.objects.get_or_create(
+        user=user, opportunity=opportunity
+    )
+    return obj
+
+
+def unsave_opportunity(*, user, opportunity_id: int) -> None:
+    SavedOpportunity.objects.filter(user=user, opportunity_id=opportunity_id).delete()
+
+
+def import_opportunities_from_xlsx(*, file_obj, created_by=None) -> dict:
     from openpyxl import load_workbook
 
     try:
@@ -173,8 +186,6 @@ def import_opportunities_from_xlsx(*, file_obj, created_by=None) -> dict:
             if value is None:
                 continue
 
-            # Convert openpyxl date/datetime objects to ISO date strings.
-            # Without this, saving to a Django DateField raises TypeError.
             if isinstance(value, (datetime.date, datetime.datetime)):
                 value = value.strftime("%Y-%m-%d")
             else:
@@ -190,7 +201,6 @@ def import_opportunities_from_xlsx(*, file_obj, created_by=None) -> dict:
         data["source"] = _normalize_source(data.get("source", ""))
         data.setdefault("currency", "USD")
 
-        # Coerce amount to float if present
         if "amount" in data:
             try:
                 data["amount"] = float(str(data["amount"]).replace(",", ""))

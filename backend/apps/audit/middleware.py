@@ -11,6 +11,14 @@ AUDIT_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 _ACTION_BY_METHOD = {"POST": "CREATE", "PUT": "UPDATE", "PATCH": "UPDATE", "DELETE": "DELETE"}
 _ID_RE = re.compile(r"/(\d+)/")
 
+# Paths that are excluded from audit logging entirely.
+_EXCLUDE_PATHS = {
+    "/api/v1/auth/token/refresh/",
+}
+
+# Only log requests whose response status indicates success.
+_SUCCESS_STATUSES = {200, 201, 204}
+
 
 class AuditLogMiddleware:
     def __init__(self, get_response):
@@ -19,23 +27,39 @@ class AuditLogMiddleware:
     def __call__(self, request):
         response = self.get_response(request)
 
-        if request.method in AUDIT_METHODS and request.path.startswith("/api/"):
-            try:
-                user = request.user if request.user.is_authenticated else None
-                ip = self._get_client_ip(request)
-                ua = request.META.get("HTTP_USER_AGENT", "")
-                create_audit_log(
-                    user=user,
-                    action=_ACTION_BY_METHOD.get(request.method, request.method),
-                    model_name=self._extract_model(request.path),
-                    record_id=self._extract_record_id(request.path),
-                    data_after={"method": request.method, "path": request.path,
-                                "status": response.status_code},
-                    ip_address=ip,
-                    user_agent=ua[:500],
-                )
-            except Exception as e:  # noqa: BLE001
-                logger.warning(f"Audit log failed: {e}")
+        if request.method not in AUDIT_METHODS:
+            return response
+        if not request.path.startswith("/api/"):
+            return response
+
+        # Skip noisy / irrelevant paths.
+        if request.path in _EXCLUDE_PATHS:
+            return response
+
+        # Only log successful writes — 4xx/5xx aren't audit-worthy.
+        if response.status_code not in _SUCCESS_STATUSES:
+            return response
+
+        try:
+            user = request.user if request.user.is_authenticated else None
+            ip = self._get_client_ip(request)
+            ua = request.META.get("HTTP_USER_AGENT", "")
+            create_audit_log(
+                user=user,
+                action=_ACTION_BY_METHOD.get(request.method, request.method),
+                model_name=self._extract_model(request.path),
+                record_id=self._extract_record_id(request.path),
+                data_after={
+                    "method": request.method,
+                    "path": request.path,
+                    "status": response.status_code,
+                    "success": True,
+                },
+                ip_address=ip,
+                user_agent=ua[:500],
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Audit log failed: {e}")
 
         return response
 

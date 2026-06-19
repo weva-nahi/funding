@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import api from '@/lib/axios'
 import { useAuthStore } from '@/store'
-import { FileText, Globe, Clock, CheckCircle } from 'lucide-react'
+import { FileText, Globe, Clock, CheckCircle, Bookmark } from 'lucide-react'
 import { formatDate, daysUntil } from '@/utils/formatDate'
 import type { Application, Opportunity, Paginated } from '@/types'
 
@@ -19,11 +19,16 @@ export function DashboardPage() {
     queryFn: () => api.get('/opportunities/?page_size=5').then(r => r.data),
   })
 
+  const { data: savedOpps } = useQuery<Paginated<Opportunity>>({
+    queryKey: ['opportunities-saved-count'],
+    queryFn: () => api.get('/opportunities/saved/?page_size=1').then(r => r.data),
+  })
+
   const stats = [
-    { label: 'Total Applications', value: apps?.count ?? 0, icon: FileText, color: 'bg-blue-100 text-blue-600' },
-    { label: 'Opportunities Available', value: opps?.count ?? 0, icon: Globe, color: 'bg-emerald-100 text-emerald-600' },
-    { label: 'Pending Review', value: apps?.results?.filter(a => a.status === 'pending').length ?? 0, icon: Clock, color: 'bg-amber-100 text-amber-600' },
-    { label: 'Approved', value: apps?.results?.filter(a => a.status === 'approved').length ?? 0, icon: CheckCircle, color: 'bg-green-100 text-green-600' },
+    { label: 'Total Applications', value: apps?.count ?? 0, icon: FileText, color: 'bg-blue-100 text-blue-600', to: '/applications' },
+    { label: 'Opportunities Available', value: opps?.count ?? 0, icon: Globe, color: 'bg-emerald-100 text-emerald-600', to: '/opportunities' },
+    { label: 'Pending Review', value: apps?.results?.filter(a => a.status === 'pending').length ?? 0, icon: Clock, color: 'bg-amber-100 text-amber-600', to: '/applications' },
+    { label: 'Saved', value: savedOpps?.count ?? 0, icon: Bookmark, color: 'bg-purple-100 text-purple-600', to: '/opportunities?saved=true' },
   ]
 
   return (
@@ -36,8 +41,8 @@ export function DashboardPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="rounded-xl border bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
+        {stats.map(({ label, value, icon: Icon, color, to }) => (
+          <Link key={label} to={to} className="rounded-xl border bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center gap-4">
               <div className={`rounded-lg p-3 ${color}`}><Icon className="h-5 w-5" /></div>
               <div>
@@ -45,7 +50,7 @@ export function DashboardPage() {
                 <p className="text-xs text-muted-foreground">{label}</p>
               </div>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
 
@@ -88,7 +93,7 @@ export function DashboardPage() {
           <Link to="/opportunities" className="text-sm text-primary hover:underline">Browse all →</Link>
         </div>
         <div className="p-6">
-          {(opps?.results?.length ?? 0) === 0 ? (
+          {(opps?.results?.filter(o => o.deadline)?.length ?? 0) === 0 ? (
             <p className="text-center py-4 text-muted-foreground">No upcoming deadlines</p>
           ) : (
             <div className="space-y-3">

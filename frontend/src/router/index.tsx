@@ -35,6 +35,7 @@ import { ConsultingRequestsPage } from '@/pages/admin/ConsultingRequestsPage'
 import { UsersPage } from '@/pages/admin/UsersPage'
 import { AnalyticsPage } from '@/pages/admin/AnalyticsPage'
 import { AuditLogsPage } from '@/pages/admin/AuditLogsPage'
+import { NotFoundPage } from '@/pages/NotFoundPage'
 
 export function AppRouter() {
   return (
@@ -75,6 +76,9 @@ export function AppRouter() {
         <Route path="/admin/analytics" element={<AnalyticsPage />} />
         <Route path="/admin/audit" element={<AuditLogsPage />} />
       </Route>
+
+      {/* 404 catch-all — must be last */}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
 }

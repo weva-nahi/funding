@@ -1,5 +1,6 @@
 """Funding Opportunity models."""
 
+from django.conf import settings
 from django.db import models
 
 from common.mixins import TimestampMixin
@@ -65,3 +66,26 @@ class FundingOpportunity(TimestampMixin):
         from common.utils.dates import is_deadline_passed
 
         return is_deadline_passed(self.deadline)
+
+
+class SavedOpportunity(TimestampMixin):
+    """A user's bookmarked opportunity ('Sauvegarder pour plus tard')."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="saved_opportunities",
+    )
+    opportunity = models.ForeignKey(
+        FundingOpportunity,
+        on_delete=models.CASCADE,
+        related_name="saves",
+    )
+
+    class Meta:
+        db_table = "saved_opportunities"
+        unique_together = ["user", "opportunity"]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user_id} saved {self.opportunity_id}"

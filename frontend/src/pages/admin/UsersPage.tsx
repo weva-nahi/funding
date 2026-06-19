@@ -4,7 +4,7 @@ import api from '@/lib/axios'
 import { Search, UserCheck, UserX } from 'lucide-react'
 import { useDebounce } from '@/hooks/useDebounce'
 import { formatDate } from '@/utils/formatDate'
-import type { User } from '@/types'
+import type { User, Paginated } from '@/types'
 
 export function UsersPage() {
   const [search, setSearch] = useState('')
@@ -12,7 +12,7 @@ export function UsersPage() {
   const debouncedSearch = useDebounce(search)
   const queryClient = useQueryClient()
 
-  const { data, isLoading, isError } = useQuery<User[]>({
+  const { data, isLoading, isError } = useQuery<Paginated<User>>({
     queryKey: ['admin-users', debouncedSearch, page],
     queryFn: () => api.get('/auth/users/', { params: { search: debouncedSearch || undefined, page } }).then(r => r.data),
   })
@@ -23,7 +23,7 @@ export function UsersPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-users'] }),
   })
 
-  const users = data ?? []
+  const users = data?.results ?? []
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -87,6 +87,14 @@ export function UsersPage() {
           </table>
         </div>
       </div>
+
+      {(data?.count ?? 0) > 20 && (
+        <div className="flex justify-center gap-2 mt-4">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={!data?.previous} className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50">Previous</button>
+          <span className="flex items-center px-4 text-sm text-muted-foreground">Page {page}</span>
+          <button onClick={() => setPage(p => p + 1)} disabled={!data?.next} className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50">Next</button>
+        </div>
+      )}
     </div>
   )
 }

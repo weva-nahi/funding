@@ -1,35 +1,14 @@
-import { useEffect } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
-import { useAuthStore, useNotificationStore } from '@/store'
-import api from '@/lib/axios'
+import { useAuthStore } from '@/store'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading } = useAuthStore()
-  const { setUnreadCount } = useNotificationStore()
+  const { user, isAuthenticated, isLoading } = useAuthStore()
   const location = useLocation()
 
-  // Fetch unread count whenever this route renders with a valid session.
-  // Runs on location change so the badge stays accurate across navigation.
-  useEffect(() => {
-    if (!isAuthenticated) return
-    api
-      .get('/notifications/unread-count/')
-      .then((res) => {
-        if (typeof res.data?.unread_count === 'number') {
-          setUnreadCount(res.data.unread_count)
-        }
-      })
-      .catch(() => {
-        // Non-critical — badge may be stale but nothing breaks
-      })
-  }, [isAuthenticated, location.pathname, setUnreadCount])
-
-  // Show a full-screen spinner while bootstrap() is in flight.
-  // This prevents the flash-to-login problem on page refresh.
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -42,8 +21,26 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!isAuthenticated) {
-    // Save the attempted location so LoginPage can redirect back after login
     return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
+  // If an admin tries to access client pages, redirect to admin home
+  const isAdminPath = location.pathname.startsWith('/admin')
+  const isClientPath = !isAdminPath && (
+    location.pathname.startsWith('/dashboard') ||
+    location.pathname.startsWith('/opportunities') ||
+    location.pathname.startsWith('/applications') ||
+    location.pathname.startsWith('/notifications') ||
+    location.pathname.startsWith('/consulting') ||
+    location.pathname.startsWith('/profile')
+  )
+
+  if (user?.role === 'admin' && isClientPath) {
+    return <Navigate to="/admin" replace />
+  }
+
+  if (user?.role === 'client' && isAdminPath) {
+    return <Navigate to="/dashboard" replace />
   }
 
   return <>{children}</>

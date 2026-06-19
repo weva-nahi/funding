@@ -1,22 +1,29 @@
 """WebSocket consumer for real-time notifications."""
 
+import logging
+from urllib.parse import parse_qs
+
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from rest_framework_simplejwt.tokens import AccessToken
 
+logger = logging.getLogger(__name__)
+
 
 class NotificationConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
-        # Authenticate via query param token
-        token = (
-            self.scope["query_string"].decode().split("token=")[-1] if b"token=" in self.scope["query_string"] else None
-        )
+        # Robust token extraction — handles any ordering of query params.
+        params = parse_qs(self.scope["query_string"].decode())
+        token = params.get("token", [None])[0]
+
         if not token:
+            logger.info("NotificationConsumer: closing — no token in query string.")
             await self.close()
             return
 
         user_id = await self._get_user_id(token)
         if not user_id:
+            logger.info("NotificationConsumer: closing — token invalid or expired.")
             await self.close()
             return
 
@@ -38,5 +45,6 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
         try:
             token = AccessToken(token_str)
             return token["user_id"]
-        except Exception:
+        except Exception as exc:  # noqa: BLE001
+            logger.info("NotificationConsumer: token decode failed: %s", exc)
             return None

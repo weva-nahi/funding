@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/axios'
+import { extractError } from '@/utils/extractError'
 import { useDropzone } from 'react-dropzone'
 import { validateFile } from '@/utils/validateFile'
 import { FileText, Upload, ArrowLeft, Send, Trash2 } from 'lucide-react'
@@ -24,19 +25,24 @@ export function NewApplicationPage() {
 
   const createMutation = useMutation({
     mutationFn: () => api.post('/applications/', { opportunity_id: parseInt(id!) }),
-    onSuccess: (res) => { setAppId(res.data.id); setStep(2) },
+    onSuccess: (res) => {
+      setError('')
+      setAppId(res.data.id)
+      setStep(2)
+    },
     onError: (err: unknown) => {
-      const ax = err as { response?: { data?: { error?: { message?: string } } } }
-      setError(ax.response?.data?.error?.message || 'Failed to create application.')
+      setError(extractError(err, 'Failed to create application.'))
     },
   })
 
   const updateMutation = useMutation({
     mutationFn: () => api.patch(`/applications/${appId}/`, { motivation_letter: letter }),
-    onSuccess: () => setStep(3),
+    onSuccess: () => {
+      setError('')
+      setStep(3)
+    },
     onError: (err: unknown) => {
-      const ax = err as { response?: { data?: { error?: { message?: string } } } }
-      setError(ax.response?.data?.error?.message || 'Failed to save letter.')
+      setError(extractError(err, 'Failed to save letter.'))
     },
   })
 
@@ -55,8 +61,7 @@ export function NewApplicationPage() {
       navigate('/applications')
     },
     onError: (err: unknown) => {
-      const ax = err as { response?: { data?: { error?: { message?: string } } } }
-      setError(ax.response?.data?.error?.message || 'Submission failed.')
+      setError(extractError(err, 'Submission failed.'))
     },
   })
 
@@ -77,6 +82,11 @@ export function NewApplicationPage() {
       'image/png': ['.png'],
     },
   })
+
+  const goToStep = (n: number) => {
+    setError('')  // Reset error state between steps
+    setStep(n)
+  }
 
   const steps = [{ num: 1, label: 'Start' }, { num: 2, label: 'Motivation' }, { num: 3, label: 'Documents' }]
 
@@ -108,7 +118,7 @@ export function NewApplicationPage() {
             <p className="text-muted-foreground text-sm">
               This will create a draft application for "{opp?.title}". You can edit it before submitting.
             </p>
-            <button onClick={() => createMutation.mutate()} disabled={createMutation.isPending}
+            <button onClick={() => { setError(''); createMutation.mutate() }} disabled={createMutation.isPending}
               className="rounded-lg bg-primary px-8 py-2.5 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50">
               {createMutation.isPending ? 'Creating...' : 'Create Draft Application'}
             </button>
@@ -124,7 +134,7 @@ export function NewApplicationPage() {
               className="w-full rounded-lg border p-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" />
             <p className="text-xs text-muted-foreground">{letter.length} characters</p>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => { updateMutation.mutate() }} disabled={!letter.trim() || updateMutation.isPending}
+              <button onClick={() => updateMutation.mutate()} disabled={!letter.trim() || updateMutation.isPending}
                 className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50">
                 {updateMutation.isPending ? 'Saving...' : 'Continue →'}
               </button>
@@ -160,8 +170,8 @@ export function NewApplicationPage() {
               </div>
             )}
             <div className="flex gap-3 justify-end pt-4 border-t">
-              <button onClick={() => setStep(2)} className="rounded-lg border px-6 py-2.5 text-sm font-medium hover:bg-muted">← Back</button>
-              <button onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending}
+              <button onClick={() => goToStep(2)} className="rounded-lg border px-6 py-2.5 text-sm font-medium hover:bg-muted">← Back</button>
+              <button onClick={() => { setError(''); submitMutation.mutate() }} disabled={submitMutation.isPending}
                 className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50">
                 <Send className="h-4 w-4" /> {submitMutation.isPending ? 'Submitting...' : 'Submit Application'}
               </button>

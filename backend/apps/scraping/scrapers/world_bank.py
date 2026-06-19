@@ -41,14 +41,8 @@ class WorldBankScraper(BaseScraper):
             if self.COUNTRY_CODE:
                 params["countrycode_exact"] = self.COUNTRY_CODE
 
-            try:
-                resp = requests.get(
-                    self.API_URL, params=params, headers=self.headers, timeout=30
-                )
-                resp.raise_for_status()
-                payload = resp.json()
-            except Exception as e:  # noqa: BLE001
-                logger.error(f"World Bank API error page {page}: {e}")
+            payload = self._get_with_retry(params)
+            if payload is None:
                 break
 
             rows = payload.get("projects") or {}
@@ -67,6 +61,10 @@ class WorldBankScraper(BaseScraper):
                 ).strip()[:1500]
                 country = (item.get("countryshortname") or "Mauritania").strip()
 
+                # Map the closing date into the real `deadline` field so
+                # classify_priority() works (it reads opportunity.deadline).
+                closing_date = self.parse_date(item.get("closingdate"))
+
                 project = {
                     "title": title,
                     "url": url,
@@ -75,11 +73,10 @@ class WorldBankScraper(BaseScraper):
                     "country": country,
                     "amount": amount,
                     "currency": "USD",
-                    # closingdate is the project closing date, not an application
-                    # deadline, so we keep it in metadata rather than `deadline`.
+                    "deadline": closing_date,
                     "metadata": {
                         "project_id": pid,
-                        "closing_date": self.parse_date(item.get("closingdate")),
+                        "closing_date": closing_date,
                         "board_approval_date": self.parse_date(
                             item.get("boardapprovaldate")
                         ),
@@ -102,3 +99,30 @@ class WorldBankScraper(BaseScraper):
             self.sleep()
 
         return projects
+
+    def _get_with_retry(self, params, attempts=3):
+        """GET the API with simple exponential backoff (2s, 4s, 8s).
+
+        The World Bank API returns intermittent 500s; retrying transparently
+        smooths those over instead of aborting the whole page.
+        """
+        import time
+
+        delay = 2
+        for attempt in range(1, attempts + 1):
+            try:
+                resp = requests.get(
+                    self.API_URL, params=params, headers=self.headers, timeout=30
+                )
+                resp.raise_for_status()
+                return resp.json()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "World Bank API attempt %s/%s failed: %s", attempt, attempts, exc
+                )
+                if attempt == attempts:
+                    logger.error("World Bank API giving up after %s attempts.", attempts)
+                    return None
+                time.sleep(delay)
+                delay *= 2
+        return None

@@ -3,9 +3,13 @@
 The projects table is fully server-rendered, so no browser automation is
 needed. Filtered to Mauritania national projects by default via the site's
 facet (project_country_national:105).
+
+On 403 responses the scraper rotates the User-Agent and retries once before
+giving up on that page, since GEF uses lightweight bot detection.
 """
 
 import logging
+import time
 
 import requests
 from bs4 import BeautifulSoup
@@ -19,8 +23,28 @@ class GEFScraper(BaseScraper):
     SOURCE_NAME = "GEF"
     BASE_URL = "https://www.thegef.org/projects-operations/database"
     DETAIL_BASE = "https://www.thegef.org"
-    # Mauritania national-projects facet id. Set to None to scrape all projects.
     COUNTRY_FACET_ID = 105
+
+    def _get_page(self, url, params):
+        """GET with one UA-rotation retry on 403."""
+        for attempt in range(2):
+            try:
+                resp = requests.get(url, params=params, headers=self.headers, timeout=40)
+                if resp.status_code == 403 and attempt == 0:
+                    logger.info("GEF: received 403, rotating User-Agent and retrying.")
+                    self.rotate_user_agent()
+                    time.sleep(3)
+                    continue
+                resp.raise_for_status()
+                return resp
+            except requests.HTTPError as exc:
+                if attempt == 0 and getattr(exc.response, "status_code", None) == 403:
+                    logger.info("GEF: 403 on attempt %s, rotating UA.", attempt + 1)
+                    self.rotate_user_agent()
+                    time.sleep(3)
+                    continue
+                raise
+        return None
 
     def scrape(self, max_pages=5, progress_callback=None):
         projects = []
@@ -32,12 +56,12 @@ class GEFScraper(BaseScraper):
                 params["page"] = page
 
             try:
-                resp = requests.get(
-                    self.BASE_URL, params=params, headers=self.headers, timeout=40
-                )
-                resp.raise_for_status()
-                soup = BeautifulSoup(resp.content, "html.parser")
+                resp = self._get_page(self.BASE_URL, params)
+                if resp is None:
+                    logger.warning("GEF: giving up on page %s after 403 retries.", page)
+                    break
 
+                soup = BeautifulSoup(resp.content, "html.parser")
                 table = soup.select_one("table.views-view-table")
                 if not table:
                     logger.info(f"GEF: no results table on page {page}, stopping.")
@@ -98,9 +122,7 @@ class GEFScraper(BaseScraper):
                         },
                     }
                     project["sector"] = self.classify_sector(f"{focal_area} {title}")
-                    project["funding_type"] = self.classify_funding_type(
-                        f"{title} {focal_area}"
-                    )
+                    project["funding_type"] = self.classify_funding_type(f"{title} {focal_area}")
                     project["hash"] = self.generate_hash(title, href, gef_id)
                     project["completeness_score"] = self.calculate_completeness_score(project)
                     projects.append(project)

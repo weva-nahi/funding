@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import api, { setAccessToken } from '@/lib/axios'
 import { useAuthStore, useNotificationStore } from '@/store'
+import { useQueryClient } from '@tanstack/react-query'
 
 const DEMO_ACCOUNTS = [
   {
@@ -33,6 +34,7 @@ export function LoginPage() {
   const { setUnreadCount } = useNotificationStore()
   const navigate = useNavigate()
   const location = useLocation()
+  const queryClient = useQueryClient()
 
   const from =
     (location.state as { from?: { pathname: string } })?.from?.pathname
@@ -49,6 +51,12 @@ export function LoginPage() {
     setLoading(true)
     try {
       const { data } = await api.post('/auth/login/', { email, password })
+
+      // CRITICAL: clear ALL cached queries from any previous user session
+      // before setting the new user. This prevents admin seeing client data
+      // and vice versa.
+      queryClient.clear()
+
       setAccessToken(data.access)
       setUser(data.user)
 
@@ -59,14 +67,26 @@ export function LoginPage() {
         // Non-critical
       }
 
+      const targetRole = data.user.role
+
+      // If there's a saved location and it belongs to the correct role, use it.
+      // Otherwise always send to the role's home page.
       if (from && from !== '/login') {
-        navigate(from, { replace: true })
-      } else {
-        navigate(
-          data.user.role === 'admin' ? '/admin' : '/dashboard',
-          { replace: true }
-        )
+        const isAdminPath = from.startsWith('/admin')
+        if (targetRole === 'admin' && isAdminPath) {
+          navigate(from, { replace: true })
+          return
+        }
+        if (targetRole === 'client' && !isAdminPath) {
+          navigate(from, { replace: true })
+          return
+        }
       }
+
+      navigate(
+        targetRole === 'admin' ? '/admin' : '/dashboard',
+        { replace: true }
+      )
     } catch (err: unknown) {
       const ax = err as {
         response?: { data?: { error?: { message?: string } } }

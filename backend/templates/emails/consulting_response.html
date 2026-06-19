@@ -1,10 +1,10 @@
 {% extends "emails/base.html" %}
 {% block content %}
-<h2>Consulting Response</h2>
-<p>Hi {{ user.email }},</p>
-<p>The Richat team has responded to your consulting request #{{ request.id }}.</p>
+<h2>Réponse à votre demande de conseil</h2>
+<p>Bonjour {{ user.email }},</p>
+<p>L'équipe Richat a répondu à votre demande de conseil n°{{ consulting_request.id }}.</p>
 <div style="background: #eff6ff; border-left: 4px solid #2563eb; padding: 12px 16px; margin: 16px 0;">
-    {{ request.admin_response }}
+    {{ consulting_request.admin_response }}
 </div>
-<a href="{{ frontend_url }}/consulting" class="btn">View Details</a>
+<a href="{{ frontend_url }}/consulting" class="btn">Voir les détails</a>
 {% endblock %}

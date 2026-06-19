@@ -31,9 +31,20 @@ class Application(TimestampMixin):
     class Meta:
         db_table = "applications"
         ordering = ["-created_at"]
-        unique_together = ["user", "opportunity"]
+        # NOTE: the old blanket unique_together (user, opportunity) was removed.
+        # It blocked re-application after withdrawal. A partial unique index
+        # (see migration 0004) now enforces "one active application per
+        # (user, opportunity)" while still allowing a withdrawn row to coexist
+        # with a fresh application.
         indexes = [
             models.Index(fields=["status", "-created_at"], name="app_status_created_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "opportunity"],
+                condition=~models.Q(status="withdrawn"),
+                name="uniq_active_application_per_user_opportunity",
+            ),
         ]
 
     def __str__(self):

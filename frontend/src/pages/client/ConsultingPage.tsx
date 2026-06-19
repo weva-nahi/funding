@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/axios'
 import { formatDate } from '@/utils/formatDate'
 import { MessageSquare, Send, CheckCircle, Clock, XCircle } from 'lucide-react'
-import type { ConsultingRequest } from '@/types'
+import type { ConsultingRequest, Paginated } from '@/types'
 
 export function ConsultingPage() {
   const queryClient = useQueryClient()
@@ -11,7 +11,7 @@ export function ConsultingPage() {
   const [priority, setPriority] = useState('medium')
   const [showForm, setShowForm] = useState(false)
 
-  const { data, isLoading } = useQuery<ConsultingRequest[]>({
+  const { data, isLoading } = useQuery<Paginated<ConsultingRequest>>({
     queryKey: ['my-consulting'],
     queryFn: () => api.get('/consulting/').then(r => r.data),
   })
@@ -24,6 +24,8 @@ export function ConsultingPage() {
       setDesc('')
     },
   })
+
+  const requests = data?.results ?? []
 
   const statusIcon = (s: string) => {
     if (s === 'resolved') return <CheckCircle className="h-4 w-4 text-emerald-600" />
@@ -68,14 +70,14 @@ export function ConsultingPage() {
 
       {isLoading ? (
         <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-20 rounded-xl bg-muted animate-pulse" />)}</div>
-      ) : (data?.length ?? 0) === 0 ? (
+      ) : requests.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <MessageSquare className="mx-auto h-12 w-12 mb-3 opacity-30" />
           <p>No consulting requests yet.</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {data?.map((req) => (
+          {requests.map((req) => (
             <div key={req.id} className="rounded-xl border bg-white p-6 shadow-sm">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2">

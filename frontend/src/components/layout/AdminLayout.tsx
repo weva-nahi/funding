@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store'
+import { useQueryClient } from '@tanstack/react-query'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import {
   LayoutDashboard, FileText, Globe, Upload, Bot, AlertTriangle, MessageSquare,
   Users, BarChart3, Shield, LogOut, Menu
@@ -24,10 +26,17 @@ export function AdminLayout() {
   const { user, logout } = useAuthStore()
   const location = useLocation()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
   const handleLogout = async () => {
-    try { const { default: api } = await import('@/lib/axios'); await api.post('/auth/logout/') } catch {}
-    logout(); navigate('/login')
+    try {
+      const { default: api } = await import('@/lib/axios')
+      await api.post('/auth/logout/')
+    } catch {}
+    // Clear ALL cached data so the next user starts fresh
+    queryClient.clear()
+    logout()
+    navigate('/login', { replace: true })
   }
 
   return (
@@ -62,6 +71,7 @@ export function AdminLayout() {
         <header className="flex h-16 items-center gap-4 border-b bg-white px-6">
           <button onClick={() => setSidebarOpen(true)} className="lg:hidden"><Menu className="h-5 w-5" /></button>
           <div className="ml-auto flex items-center gap-4">
+            <LanguageSwitcher />
             <span className="rounded-full bg-teal-100 px-3 py-1 text-xs font-semibold text-teal-700">Admin</span>
             <span className="text-sm text-muted-foreground">{user?.email}</span>
           </div>

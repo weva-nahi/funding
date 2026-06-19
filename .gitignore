@@ -1,65 +1,69 @@
-# Environment & secrets
+# Credentials — never commit
 .env
-.env.*
+*.env
 !.env.example
+!.env.prod.example
+
+# Certificates / keys
 *.pem
 *.key
 nginx/certs/
 
-# Cookie / debug artifacts that were being committed
-cookies.txt
+# Cookies / sessions
+cookies*.txt
 admin_cookies.txt
+cookies_admin.txt
+cookies_client.txt
 *.cookies
 
-# Generated data exports
+# Generated exports / reports
+*.csv
 analytics_*.csv
 analytics_report.csv
 
 # Python
+*.pyc
+*.pyo
+*.pyd
 __pycache__/
-*.py[cod]
 *.egg-info/
+*.egg
 .venv/
 venv/
-*.sqlite3
-db.sqlite3
-
-# Django
-backend/media/
-backend/staticfiles/
-backend/static/
-
-# Node / frontend
-node_modules/
-frontend/dist/
-frontend/.vite/
-npm-debug.log*
-yarn-error.log*
-
-# Testing / coverage
 .pytest_cache/
 .coverage
 htmlcov/
+.mypy_cache/
+*.sqlite3
+db.sqlite3
 
-# IDE / OS
-.idea/
-.vscode/
-.DS_Store
-*.swp
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+npm-debug.log*
+yarn-error.log*
+.vite/
 
+# Django generated
+media/
+staticfiles/
+static/
+test_media/
 
-# .gitignore additions
-.env
-cookies*.txt
-**/admin_cookies.txt
-*.csv
-*.key
-*.pemadmin_cookies.txt
-cookies_admin.txt
-cookies_client.txt
-cookies.txt
-analytics_test.csv
+# Logs
+*.log
+
+# Testing files
 test_import.xlsx
 test_document.pdf
-cookies.txt
-admin_cookies.txt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp

@@ -1,16 +1,9 @@
 import { create } from 'zustand'
 import type { User } from '@/types'
 
-// ─── Auth Store ───────────────────────────────────────────────────────────────
-
 interface AuthState {
   user: User | null
   isAuthenticated: boolean
-  /**
-   * true while bootstrap() is attempting a silent token refresh.
-   * ProtectedRoute shows a full-screen spinner during this window.
-   * Must be set to false by setUser() or setLoading(false) when bootstrap ends.
-   */
   isLoading: boolean
   setUser: (user: User | null) => void
   setLoading: (loading: boolean) => void
@@ -20,13 +13,16 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isAuthenticated: false,
-  isLoading: true, // true until bootstrap() resolves
+  isLoading: true,
 
   setUser: (user) => {
+    if (user) {
+      sessionStorage.setItem('has_session', '1')
+    } else {
+      sessionStorage.removeItem('has_session')
+    }
     set({ user, isAuthenticated: !!user, isLoading: false })
 
-    // Connect or disconnect the notification WebSocket based on auth state.
-    // Lazy import avoids circular dependency at module load time.
     if (user) {
       import('@/lib/websocket').then(({ notificationWS }) => {
         notificationWS.connect()
@@ -41,19 +37,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   setLoading: (isLoading) => set({ isLoading }),
 
   logout: () => {
+    sessionStorage.removeItem('has_session')
     set({ user: null, isAuthenticated: false, isLoading: false })
-    // Disconnect WebSocket
     import('@/lib/websocket').then(({ notificationWS }) => {
       notificationWS.disconnect()
     })
-    // Clear in-memory access token
     import('@/lib/axios').then(({ setAccessToken }) => {
       setAccessToken(null)
     })
   },
 }))
-
-// ─── Notification Store ───────────────────────────────────────────────────────
 
 interface NotificationState {
   unreadCount: number

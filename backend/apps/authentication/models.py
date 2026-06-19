@@ -2,13 +2,12 @@
 
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
+from django.utils import timezone
 
 from common.mixins import TimestampMixin
 
 
 class UserManager(BaseUserManager):
-    """Custom user manager using email as the unique identifier."""
-
     def create_user(self, email, password=None, **extra_fields):
         if not email:
             raise ValueError("Email is required")
@@ -26,8 +25,6 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractBaseUser, PermissionsMixin, TimestampMixin):
-    """Custom user model — email-based authentication."""
-
     ROLE_CHOICES = [
         ("admin", "Admin"),
         ("client", "Client"),
@@ -39,8 +36,6 @@ class User(AbstractBaseUser, PermissionsMixin, TimestampMixin):
     is_staff = models.BooleanField(default=False)
     is_email_verified = models.BooleanField(default=False)
     last_login = models.DateTimeField(null=True, blank=True)
-
-    # Account lockout
     failed_login_attempts = models.IntegerField(default=0)
     locked_until = models.DateTimeField(null=True, blank=True)
 
@@ -69,6 +64,11 @@ class User(AbstractBaseUser, PermissionsMixin, TimestampMixin):
 class Profile(TimestampMixin):
     """Extended user profile information."""
 
+    NOTIFY_FREQUENCY_CHOICES = [
+        ("immediate", "Immediate"),
+        ("daily", "Daily Digest"),
+    ]
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     first_name = models.CharField(max_length=100, blank=True)
     last_name = models.CharField(max_length=100, blank=True)
@@ -85,6 +85,14 @@ class Profile(TimestampMixin):
     notify_system_announcements = models.BooleanField(default=True)
     notify_email_enabled = models.BooleanField(default=True)
 
+    notify_frequency = models.CharField(
+        max_length=10,
+        choices=NOTIFY_FREQUENCY_CHOICES,
+        default="immediate",
+    )
+
+    pending_digest = models.JSONField(default=list, blank=True)
+
     class Meta:
         db_table = "profiles"
 
@@ -94,3 +102,41 @@ class Profile(TimestampMixin):
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
+
+
+class EmailVerificationToken(models.Model):
+    """Persistent email verification tokens — survives Redis restarts."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="verification_tokens")
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    expires_at = models.DateTimeField()
+    used = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "email_verification_tokens"
+
+    def is_valid(self):
+        return not self.used and self.expires_at > timezone.now()
+
+    def __str__(self):
+        return f"{self.user.email} — {self.token[:8]}..."
+
+
+class PasswordResetToken(models.Model):
+    """Persistent password reset tokens — survives Redis restarts."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reset_tokens")
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    expires_at = models.DateTimeField()
+    used = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "password_reset_tokens"
+
+    def is_valid(self):
+        return not self.used and self.expires_at > timezone.now()
+
+    def __str__(self):
+        return f"{self.user.email} — {self.token[:8]}..."

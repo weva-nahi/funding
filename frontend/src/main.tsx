@@ -7,25 +7,17 @@ import { useAuthStore } from '@/store'
 import { setAccessToken } from '@/lib/axios'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import api from '@/lib/axios'
+import '@/lib/i18n'
 import App from './App'
 import './styles/globals.css'
 
-/**
- * bootstrap() runs BEFORE the React tree mounts.
- *
- * On every cold start it attempts a silent token refresh using the httpOnly
- * refresh-token cookie set at login:
- *   1. POST /auth/token/refresh/  → new access token (stored in memory)
- *   2. GET  /auth/me/             → current user → setUser()
- *
- * If the cookie is absent or expired, the catch block calls setLoading(false),
- * isAuthenticated stays false, and ProtectedRoute will redirect to /login.
- *
- * Whatever happens, we mount via .finally() so a failed refresh can NEVER
- * leave the page blank.
- */
 async function bootstrap(): Promise<void> {
   const { setUser, setLoading } = useAuthStore.getState()
+
+  if (!sessionStorage.getItem('has_session')) {
+    setLoading(false)
+    return
+  }
 
   try {
     const refreshRes = await api.post('/auth/token/refresh/')
@@ -41,7 +33,7 @@ async function bootstrap(): Promise<void> {
     const meRes = await api.get('/auth/me/')
     setUser(meRes.data)
   } catch {
-    // No valid session — stop loading so ProtectedRoute can redirect.
+    sessionStorage.removeItem('has_session')
     setLoading(false)
   }
 }

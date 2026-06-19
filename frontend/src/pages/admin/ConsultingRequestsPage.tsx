@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/axios'
 import { formatDate } from '@/utils/formatDate'
+import { extractError } from '@/utils/extractError'
 import type { ConsultingRequest, Paginated } from '@/types'
 
 export function ConsultingRequestsPage() {
@@ -9,7 +10,8 @@ export function ConsultingRequestsPage() {
   const [page, setPage] = useState(1)
   const [respondingTo, setRespondingTo] = useState<ConsultingRequest | null>(null)
   const [response, setResponse] = useState('')
-  const [action, setAction] = useState<'resolve' | 'reject'>('resolve')
+  const [action, setAction] = useState<'resolve' | 'reject' | 'in_progress'>('resolve')
+  const [respondError, setRespondError] = useState('')
 
   const { data, isLoading, isError } = useQuery<Paginated<ConsultingRequest>>({
     queryKey: ['admin-consulting-requests', page],
@@ -22,8 +24,19 @@ export function ConsultingRequestsPage() {
       queryClient.invalidateQueries({ queryKey: ['admin-consulting-requests'] })
       setRespondingTo(null)
       setResponse('')
+      setRespondError('')
+    },
+    onError: (err: unknown) => {
+      setRespondError(extractError(err, 'Failed to send response.'))
     },
   })
+
+  const statusColor = (s: string) => {
+    if (s === 'resolved') return 'bg-emerald-100 text-emerald-700'
+    if (s === 'rejected') return 'bg-red-100 text-red-700'
+    if (s === 'in_progress') return 'bg-blue-100 text-blue-700'
+    return 'bg-amber-100 text-amber-700'
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -54,11 +67,9 @@ export function ConsultingRequestsPage() {
                     req.priority === 'medium' ? 'bg-amber-100 text-amber-700' :
                     'bg-gray-100 text-gray-700'
                   }`}>{req.priority}</span>
-                  <span className={`px-2.5 py-1 text-xs font-bold rounded-full uppercase tracking-wide ${
-                    req.status === 'resolved' ? 'bg-emerald-100 text-emerald-700' :
-                    req.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                    'bg-amber-100 text-amber-700'
-                  }`}>{req.status}</span>
+                  <span className={`px-2.5 py-1 text-xs font-bold rounded-full uppercase tracking-wide ${statusColor(req.status)}`}>
+                    {req.status}
+                  </span>
                 </div>
               </div>
               <p className="text-sm bg-muted/30 p-4 rounded-lg border">{req.description}</p>
@@ -68,9 +79,9 @@ export function ConsultingRequestsPage() {
                   <p className="text-sm text-blue-700">{req.admin_response}</p>
                 </div>
               )}
-              {req.status === 'pending' && (
+              {req.status !== 'resolved' && req.status !== 'rejected' && (
                 <div className="mt-4 flex justify-end">
-                  <button onClick={() => setRespondingTo(req)}
+                  <button onClick={() => { setRespondingTo(req); setRespondError('') }}
                     className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90">
                     Respond to Request
                   </button>
@@ -93,27 +104,43 @@ export function ConsultingRequestsPage() {
           <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold">Respond to Request #{respondingTo.id}</h2>
-              <button onClick={() => setRespondingTo(null)} className="text-muted-foreground hover:bg-muted p-1 rounded text-lg leading-none">✕</button>
+              <button onClick={() => { setRespondingTo(null); setRespondError('') }}
+                className="text-muted-foreground hover:bg-muted p-1 rounded text-lg leading-none">✕</button>
             </div>
             <p className="text-sm text-muted-foreground mb-3 bg-muted/30 p-3 rounded-lg">{respondingTo.description}</p>
+            {respondError && (
+              <div className="mb-3 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{respondError}</div>
+            )}
             <textarea value={response} onChange={e => setResponse(e.target.value)} rows={4}
-              placeholder="Write your response..."
+              placeholder={action === 'in_progress' ? 'Optional note (e.g. "Being investigated")…' : 'Write your response…'}
               className="w-full rounded-lg border p-3 text-sm focus:ring-2 focus:ring-primary outline-none mb-3" />
-            <div className="flex items-center gap-3 mb-4">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="radio" name="action" value="resolve" checked={action === 'resolve'} onChange={() => setAction('resolve')} />
-                Resolve
-              </label>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="radio" name="action" value="reject" checked={action === 'reject'} onChange={() => setAction('reject')} />
-                Reject
-              </label>
+
+            {/* Action selector — now includes in_progress */}
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              {(['resolve', 'in_progress', 'reject'] as const).map((a) => (
+                <label key={a} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="radio" name="action" value={a} checked={action === a}
+                    onChange={() => setAction(a)} />
+                  {a === 'resolve' ? 'Resolve' : a === 'in_progress' ? 'Mark In Progress' : 'Reject'}
+                </label>
+              ))}
             </div>
+
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setRespondingTo(null)} className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">Cancel</button>
-              <button onClick={() => respondMutation.mutate()} disabled={response.length < 5 || respondMutation.isPending}
-                className="rounded-lg bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
-                {respondMutation.isPending ? 'Sending...' : 'Send Response'}
+              <button onClick={() => { setRespondingTo(null); setRespondError('') }}
+                className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">Cancel</button>
+              <button
+                onClick={() => respondMutation.mutate()}
+                disabled={
+                  (action !== 'in_progress' && response.trim().length < 5) ||
+                  respondMutation.isPending
+                }
+                className={`rounded-lg px-6 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
+                  action === 'resolve' ? 'bg-emerald-600 hover:bg-emerald-700' :
+                  action === 'in_progress' ? 'bg-blue-600 hover:bg-blue-700' :
+                  'bg-red-600 hover:bg-red-700'
+                }`}>
+                {respondMutation.isPending ? 'Sending…' : 'Send Response'}
               </button>
             </div>
           </div>

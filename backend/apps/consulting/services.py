@@ -16,6 +16,16 @@ def respond_to_request(*, request_id, admin_user, response, action="resolve"):
     if req.status in ("resolved", "rejected"):
         raise ApplicationError("This request has already been handled.")
 
+    # in_progress is an intermediate transition — mark it without closing the
+    # request or sending a completion notification.
+    if action == "in_progress":
+        req.status = "in_progress"
+        if response:
+            req.admin_response = response
+        req.responded_by = admin_user
+        req.save(update_fields=["status", "admin_response", "responded_by", "updated_at"])
+        return req
+
     req.admin_response = response
     req.responded_by = admin_user
     req.responded_at = timezone.now()
@@ -23,6 +33,7 @@ def respond_to_request(*, request_id, admin_user, response, action="resolve"):
     req.save()
 
     from apps.notifications.services import create_notification
+    from apps.notifications.tasks import send_consulting_response_email
 
     create_notification(
         user=req.user,
@@ -30,4 +41,5 @@ def respond_to_request(*, request_id, admin_user, response, action="resolve"):
         notification_type="consulting_response",
         category="consulting",
     )
+    send_consulting_response_email.delay(req.id)
     return req

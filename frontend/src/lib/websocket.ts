@@ -3,15 +3,6 @@
  *
  * In development: Vite proxies /ws/ → ws://backend:8000/ws/
  * In production:  nginx proxies /ws/ → ws://backend:8000/ws/
- *
- * We build the WebSocket URL from window.location so it works in both
- * environments without hardcoded hostnames.
- *
- * Usage:
- *   notificationWS.connect()          // call after login
- *   notificationWS.disconnect()       // call on logout
- *   const unsub = notificationWS.subscribe(handler)
- *   unsub()                           // remove the handler
  */
 import { getAccessToken } from './axios'
 
@@ -24,38 +15,34 @@ class WebSocketManager {
   private reconnectAttempts = 0
   private readonly maxReconnectAttempts = 10
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
-  /**
-   * Set to false before deliberately closing the socket so the onclose
-   * handler does NOT trigger a reconnect attempt.
-   */
   private shouldReconnect = true
 
   constructor(path: string) {
-    // path should start with /ws/
     this.path = path
   }
 
   private buildUrl(): string {
     const token = getAccessToken()
-    // Build WS URL from current window location so proxy works correctly
-    // in both dev (Vite proxy) and prod (nginx proxy)
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const host = window.location.host // e.g. localhost:5173 in dev
+    const host = window.location.host
     return `${protocol}//${host}${this.path}${token ? `?token=${token}` : ''}`
+  }
+
+  /** Returns true if the socket is open or in the process of opening. */
+  isConnected(): boolean {
+    return (
+      this.ws !== null &&
+      (this.ws.readyState === WebSocket.OPEN ||
+        this.ws.readyState === WebSocket.CONNECTING)
+    )
   }
 
   connect(): void {
     const token = getAccessToken()
-    if (!token) return // No point connecting without an access token
+    if (!token) return
 
-    // Don't open a second connection if one is already open or opening
-    if (
-      this.ws &&
-      (this.ws.readyState === WebSocket.OPEN ||
-        this.ws.readyState === WebSocket.CONNECTING)
-    ) {
-      return
-    }
+    // Deduplicate — don't open a second connection.
+    if (this.isConnected()) return
 
     this.shouldReconnect = true
     const url = this.buildUrl()
@@ -93,14 +80,9 @@ class WebSocketManager {
       console.debug(`[WS] Max reconnect attempts reached for ${this.path}`)
       return
     }
-    const delay = Math.min(
-      1000 * Math.pow(2, this.reconnectAttempts),
-      30_000
-    )
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30_000)
     this.reconnectAttempts++
-    console.debug(
-      `[WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`
-    )
+    console.debug(`[WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`)
     this.reconnectTimer = setTimeout(() => this.connect(), delay)
   }
 
@@ -112,16 +94,12 @@ class WebSocketManager {
   }
 
   disconnect(): void {
-    // Must set shouldReconnect=false BEFORE calling close() so onclose
-    // does not schedule a reconnect.
     this.shouldReconnect = false
-
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer)
       this.reconnectTimer = null
     }
     this.reconnectAttempts = 0
-
     if (this.ws) {
       this.ws.close(1000, 'Intentional disconnect')
       this.ws = null

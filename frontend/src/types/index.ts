@@ -44,6 +44,7 @@ export interface Opportunity {
   status: OpportunityStatus
   url?: string
   is_expired?: boolean
+  is_saved?: boolean
   created_at: string
   updated_at?: string
 }

@@ -2,6 +2,7 @@
 
 import bleach
 from django.conf import settings
+from django.db import IntegrityError
 
 from common.exceptions import ApplicationError
 
@@ -21,6 +22,12 @@ def _sanitize(html: str) -> str:
 
 
 def create_draft(*, user, opportunity) -> Application:
+    # Business rule: a user may hold only ONE active (non-withdrawn)
+    # application per opportunity, but may re-apply after withdrawing.
+    # The DB now enforces this with a partial unique index covering only
+    # non-withdrawn rows (see migration 0004). We still check explicitly to
+    # return a friendly error, and we catch IntegrityError as a race-safe
+    # fallback so a duplicate never escapes as a raw HTTP 500.
     if (
         Application.objects.filter(user=user, opportunity=opportunity)
         .exclude(status="withdrawn")
@@ -32,9 +39,15 @@ def create_draft(*, user, opportunity) -> Application:
     if opportunity.is_expired:
         raise ApplicationError("This opportunity's deadline has passed.")
 
-    app = Application.objects.create(
-        user=user, opportunity=opportunity, status="draft"
-    )
+    try:
+        app = Application.objects.create(
+            user=user, opportunity=opportunity, status="draft"
+        )
+    except IntegrityError as exc:
+        raise ApplicationError(
+            "You already have an active application for this opportunity."
+        ) from exc
+
     _record_status_change(app, "", "draft", user)
     return app
 

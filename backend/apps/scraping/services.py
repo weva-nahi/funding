@@ -1,5 +1,6 @@
 """Scraping orchestration services."""
 
+import datetime
 import logging
 
 from django.utils import timezone
@@ -66,9 +67,26 @@ def save_projects(*, projects: list, job: ScrapingJob):
     return {"created": created, "duplicates": duplicates}
 
 
+def _coerce_date(value):
+    """Coerce deadline to datetime.date regardless of whether it's a string or date."""
+    if value is None:
+        return None
+    if isinstance(value, datetime.datetime):
+        return value.date()
+    if isinstance(value, datetime.date):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.date.fromisoformat(value)
+        except (ValueError, TypeError):
+            return None
+    return None
+
+
 def classify_priority(opportunity):
-    if opportunity.deadline:
-        days = (opportunity.deadline - timezone.now().date()).days
+    deadline = _coerce_date(opportunity.deadline)
+    if deadline:
+        days = (deadline - timezone.now().date()).days
         amount = float(opportunity.amount or 0)
         if days <= 7 or amount > 1_000_000:
             return "urgent"

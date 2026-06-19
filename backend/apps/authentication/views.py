@@ -4,8 +4,10 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from common.pagination import StandardPagination
 from common.permissions import IsAdmin
 
 from . import selectors, services
@@ -40,6 +42,8 @@ class RegisterView(APIView):
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
 
     @extend_schema(request=LoginSerializer, responses={200: TokenSerializer}, tags=["Authentication"])
     def post(self, request):
@@ -208,7 +212,21 @@ class ProfileView(APIView):
 
     @extend_schema(request=ProfileSerializer, responses={200: ProfileSerializer}, tags=["Authentication"])
     def patch(self, request):
-        profile = services.update_profile(user=request.user, **request.data)
+        # Route through the serializer so input is validated before it reaches
+        # the service. Supports multipart (avatar upload) and JSON.
+        serializer = ProfileSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        validated = dict(serializer.validated_data)
+
+        # Avatar is a file field and isn't part of update_profile's allowed
+        # scalar kwargs — handle it directly if present.
+        avatar = request.FILES.get("avatar")
+        profile = services.update_profile(user=request.user, **validated)
+        if avatar is not None:
+            profile.avatar = avatar
+            profile.save(update_fields=["avatar"])
+
         return Response(ProfileSerializer(profile).data)
 
 
@@ -219,7 +237,9 @@ class UserListView(APIView):
     def get(self, request):
         search = request.query_params.get("search")
         users = selectors.get_active_users(search=search)
-        return Response(UserSerializer(users, many=True).data)
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(users, request)
+        return paginator.get_paginated_response(UserSerializer(page, many=True).data)
 
 
 class UserDetailView(APIView):

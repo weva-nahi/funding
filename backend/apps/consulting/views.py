@@ -18,7 +18,11 @@ class ClientConsultingListView(APIView):
     @extend_schema(responses={200: ConsultingRequestSerializer(many=True)}, tags=["Consulting"])
     def get(self, request):
         reqs = selectors.get_user_requests(user=request.user)
-        return Response(ConsultingRequestSerializer(reqs, many=True).data)
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(reqs, request)
+        return paginator.get_paginated_response(
+            ConsultingRequestSerializer(page, many=True).data
+        )
 
     @extend_schema(
         request=ConsultingCreateSerializer, responses={201: ConsultingRequestSerializer}, tags=["Consulting"]
@@ -65,7 +69,7 @@ class AdminConsultingRespondView(APIView):
         req = services.respond_to_request(
             request_id=pk,
             admin_user=request.user,
-            response=serializer.validated_data["response"],
+            response=serializer.validated_data.get("response", ""),
             action=serializer.validated_data["action"],
         )
         return Response(ConsultingRequestSerializer(req).data)
