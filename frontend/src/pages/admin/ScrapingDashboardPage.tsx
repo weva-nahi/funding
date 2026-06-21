@@ -4,13 +4,14 @@ import api from '@/lib/axios'
 import { scrapingWS } from '@/lib/websocket'
 import { SOURCES } from '@/lib/constants'
 import { formatDate } from '@/utils/formatDate'
-import { Activity, Play, XSquare } from 'lucide-react'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { Activity, Play, XSquare, Zap } from 'lucide-react'
 import type { Paginated, ScrapingJob } from '@/types'
 
 interface ScrapingUpdate {
   job_id: number
   pages_scraped: number
-  total_pages: number
+  total_pages: number | null
   projects_found: number
   status: string
 }
@@ -18,8 +19,9 @@ interface ScrapingUpdate {
 export function ScrapingDashboardPage() {
   const queryClient = useQueryClient()
   const [source, setSource] = useState('gef')
-  const [pages, setPages] = useState(5)
   const [activeJobs, setActiveJobs] = useState<Record<number, ScrapingUpdate>>({})
+  const [confirmAll, setConfirmAll] = useState(false)
+  const [confirmCancel, setConfirmCancel] = useState<number | null>(null)
 
   const { data, isLoading } = useQuery<Paginated<ScrapingJob>>({
     queryKey: ['scraping-jobs'],
@@ -27,9 +29,6 @@ export function ScrapingDashboardPage() {
   })
 
   useEffect(() => {
-    // Connect once — DO NOT disconnect on unmount so the singleton WS
-    // keeps feeding progress updates even if the user navigates away and
-    // comes back. The WS manager itself deduplicates connect calls.
     scrapingWS.connect()
 
     const unsubscribe = scrapingWS.subscribe((raw) => {
@@ -45,58 +44,79 @@ export function ScrapingDashboardPage() {
 
     return () => {
       unsubscribe()
-      // Intentionally NOT calling scrapingWS.disconnect() here.
-      // The WS stays alive for the entire admin session.
     }
   }, [queryClient])
 
   const startMutation = useMutation({
-    mutationFn: () => api.post('/scraping/start/', { source, max_pages: pages }),
+    mutationFn: () => api.post('/scraping/start/', { source }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['scraping-jobs'] }),
+  })
+
+  const startAllMutation = useMutation({
+    mutationFn: () => api.post('/scraping/start-all/'),
+    onSuccess: () => {
+      setConfirmAll(false)
+      queryClient.invalidateQueries({ queryKey: ['scraping-jobs'] })
+    },
   })
 
   const cancelMutation = useMutation({
     mutationFn: (id: number) => api.post(`/scraping/jobs/${id}/cancel/`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['scraping-jobs'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scraping-jobs'] })
+      setConfirmCancel(null)
+    },
   })
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Scraping Orchestrator</h1>
-        <p className="text-muted-foreground mt-1">Manage background web scraping jobs</p>
+        <p className="text-muted-foreground mt-1">
+          Manage background web scraping jobs — every source scrapes Mauritania-only
+          opportunities until exhausted (no page limit).
+        </p>
       </div>
 
-      <div className="rounded-xl border bg-white p-6 shadow-sm flex flex-col sm:flex-row gap-4 items-end">
-        <div className="flex-1 w-full space-y-1.5">
-          <label className="text-sm font-medium">Target Source</label>
-          <select value={source} onChange={e => setSource(e.target.value)} className="w-full rounded-lg border px-3 py-2.5 text-sm bg-white">
-            {SOURCES.map(s => <option key={s.value} value={s.value.toLowerCase()}>{s.label}</option>)}
-          </select>
+      <div className="rounded-xl border bg-white p-6 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row gap-4 items-end">
+          <div className="flex-1 w-full space-y-1.5">
+            <label className="text-sm font-medium">Target Source</label>
+            <select value={source} onChange={e => setSource(e.target.value)} className="w-full rounded-lg border px-3 py-2.5 text-sm bg-white">
+              {SOURCES.map(s => <option key={s.value} value={s.value.toLowerCase()}>{s.label}</option>)}
+            </select>
+          </div>
+          <button onClick={() => startMutation.mutate()} disabled={startMutation.isPending}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-8 py-2.5 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:opacity-50">
+            <Play className="h-4 w-4" /> Start This Source
+          </button>
         </div>
-        <div className="flex-1 w-full space-y-1.5">
-          <label className="text-sm font-medium">Max Pages</label>
-          <input type="number" value={pages} onChange={e => setPages(parseInt(e.target.value) || 1)} min={1} max={20} className="w-full rounded-lg border px-3 py-2.5 text-sm" />
+
+        <div className="pt-4 border-t flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">Scrape all sources at once</p>
+            <p className="text-xs text-muted-foreground">Starts {SOURCES.length} independent jobs, one per source.</p>
+          </div>
+          <button onClick={() => setConfirmAll(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-6 py-2.5 text-sm font-semibold text-white shadow hover:bg-purple-700">
+            <Zap className="h-4 w-4" /> Scrape All Sources
+          </button>
         </div>
-        <button onClick={() => startMutation.mutate()} disabled={startMutation.isPending}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-8 py-2.5 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:opacity-50">
-          <Play className="h-4 w-4" /> Start Job
-        </button>
       </div>
 
       <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
         <h2 className="text-lg font-semibold p-6 border-b">Scraping History</h2>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
+          <table className="w-full text-sm text-start">
             <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="px-6 py-3 font-medium">ID</th>
                 <th className="px-6 py-3 font-medium">Source</th>
                 <th className="px-6 py-3 font-medium">Status</th>
-                <th className="px-6 py-3 font-medium">Progress</th>
-                <th className="px-6 py-3 font-medium">Found</th>
+                <th className="px-6 py-3 font-medium">Pages Scraped</th>
+                <th className="px-6 py-3 font-medium">Found (Mauritania)</th>
                 <th className="px-6 py-3 font-medium">Started At</th>
-                <th className="px-6 py-3 font-medium text-right">Actions</th>
+                <th className="px-6 py-3 font-medium text-end">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -109,7 +129,7 @@ export function ScrapingDashboardPage() {
                   const wsData = activeJobs[job.id] || null
                   const status = wsData?.status || job.status
                   const isRunning = status === 'running' || status === 'pending'
-                  const progressStr = wsData ? `${wsData.pages_scraped}/${wsData.total_pages}` : `${job.pages_scraped} pages`
+                  const pagesStr = wsData ? `${wsData.pages_scraped}` : `${job.pages_scraped}`
                   const found = wsData?.projects_found ?? job.projects_found
                   return (
                     <tr key={job.id} className="border-b last:border-0 hover:bg-muted/20">
@@ -126,12 +146,12 @@ export function ScrapingDashboardPage() {
                           {status}
                         </span>
                       </td>
-                      <td className="px-6 py-4">{progressStr}</td>
+                      <td className="px-6 py-4">{pagesStr}</td>
                       <td className="px-6 py-4 font-semibold text-emerald-600">{found}</td>
                       <td className="px-6 py-4 text-muted-foreground whitespace-nowrap">{formatDate(job.started_at)}</td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-4 text-end">
                         {isRunning && (
-                          <button onClick={() => cancelMutation.mutate(job.id)} className="text-red-500 hover:text-red-700 rounded-lg p-1 hover:bg-red-50">
+                          <button onClick={() => setConfirmCancel(job.id)} className="text-red-500 hover:text-red-700 rounded-lg p-1 hover:bg-red-50">
                             <XSquare className="h-5 w-5" />
                           </button>
                         )}
@@ -144,6 +164,27 @@ export function ScrapingDashboardPage() {
           </table>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmAll}
+        title="Scrape all sources?"
+        message={`This will start ${SOURCES.length} independent scraping jobs (one per source). Each job runs until its source is exhausted, which can take a while for larger sources.`}
+        confirmLabel="Start All"
+        isLoading={startAllMutation.isPending}
+        onConfirm={() => startAllMutation.mutate()}
+        onCancel={() => setConfirmAll(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmCancel !== null}
+        title="Cancel this scraping job?"
+        message="The job will stop at its current progress. Any opportunities already saved will remain in the database."
+        variant="warning"
+        confirmLabel="Cancel Job"
+        isLoading={cancelMutation.isPending}
+        onConfirm={() => confirmCancel !== null && cancelMutation.mutate(confirmCancel)}
+        onCancel={() => setConfirmCancel(null)}
+      />
     </div>
   )
 }

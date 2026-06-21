@@ -7,7 +7,14 @@ from common.mixins import TimestampMixin
 
 
 class FundingOpportunity(TimestampMixin):
-    """A climate funding opportunity from an international source."""
+    """A climate funding opportunity from an international source.
+
+    Restricted to Mauritania: scrapers only ingest Mauritania-targeted
+    projects (see apps.scraping.services), so `country` is expected to
+    always resolve to Mauritania for scraped rows, and `city` captures the
+    specific Mauritanian locality the project targets when the source data
+    allows it to be parsed out (e.g. "Nouakchott", "Nouadhibou", "Rosso").
+    """
 
     SOURCE_CHOICES = [
         ("GEF", "Global Environment Facility"),
@@ -36,6 +43,7 @@ class FundingOpportunity(TimestampMixin):
     source = models.CharField(max_length=50, choices=SOURCE_CHOICES, db_index=True)
     description = models.TextField(blank=True)
     country = models.CharField(max_length=100, blank=True, db_index=True)
+    city = models.CharField(max_length=100, blank=True, db_index=True)
     amount = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
     currency = models.CharField(max_length=10, default="USD")
     deadline = models.DateField(null=True, blank=True, db_index=True)

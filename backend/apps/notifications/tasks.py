@@ -5,13 +5,15 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.utils import timezone
 
+from common.utils.email_i18n import BASE_FOOTER, CONSULTING_RESPONSE, resolve_language, unsubscribe_url
+
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def send_notification_email(self, user_id: int, subject: str, message: str):
     from apps.authentication.models import User
 
     try:
-        user = User.objects.get(id=user_id)
+        user = User.objects.select_related("profile").get(id=user_id)
         if hasattr(user, "profile") and not user.profile.notify_email_enabled:
             return
         send_mail(
@@ -33,22 +35,38 @@ def send_consulting_response_email(self, consulting_request_id: int):
     from apps.consulting.models import ConsultingRequest
 
     try:
-        req = ConsultingRequest.objects.select_related("user").get(id=consulting_request_id)
+        req = ConsultingRequest.objects.select_related("user", "user__profile").get(id=consulting_request_id)
         if not req.admin_response:
             return
+
+        user = req.user
+        if hasattr(user, "profile") and not user.profile.notify_email_enabled:
+            return
+
+        lang = resolve_language(user)
+        t = CONSULTING_RESPONSE[lang]
         html_message = render_to_string(
             "emails/consulting_response.html",
             {
-                "user": req.user,
+                "user": user,
                 "consulting_request": req,
                 "frontend_url": settings.FRONTEND_URL,
+                "t": {
+                    **t,
+                    "greeting": t["greeting"].format(email=user.email),
+                    "body": t["body"].format(request_id=req.id),
+                },
+                "footer_t": BASE_FOOTER[lang],
+                "unsubscribe_url": unsubscribe_url(user.id),
+                "unsubscribe_label": t["unsubscribe"],
+                "dir": "rtl" if lang == "ar" else "ltr",
             },
         )
         send_mail(
-            subject=f"Richat — Réponse à votre demande de conseil #{req.id}",
+            subject=f"{t['preheader']} #{req.id}",
             message=req.admin_response,
             from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@richat.mr"),
-            recipient_list=[req.user.email],
+            recipient_list=[user.email],
             html_message=html_message,
             fail_silently=False,
         )
@@ -64,9 +82,8 @@ def send_daily_digests():
     Collects all pending_digest messages for each user, sends a single
     summary email, then clears the queue.
     """
-    from django.template.loader import render_to_string
-
     from apps.authentication.models import Profile
+    from common.utils.email_i18n import unsubscribe_url as _unsub_url
 
     profiles = Profile.objects.filter(
         notify_frequency="daily",
@@ -80,13 +97,23 @@ def send_daily_digests():
         if not messages:
             continue
 
+        lang = profile.preferred_language if profile.preferred_language in ("fr", "en", "ar") else "fr"
         body = "\n".join(f"• {m}" for m in messages)
-        subject = f"Richat Funding Tracker — Résumé quotidien ({len(messages)} notification{'s' if len(messages) != 1 else ''})"
+
+        if lang == "en":
+            subject = f"Richat Funding Tracker — Daily summary ({len(messages)} notification{'s' if len(messages) != 1 else ''})"
+            footer = f"\n\nUnsubscribe: {_unsub_url(profile.user_id)}"
+        elif lang == "ar":
+            subject = f"Richat Funding Tracker — ملخص يومي ({len(messages)} إشعار)"
+            footer = f"\n\nإلغاء الاشتراك: {_unsub_url(profile.user_id)}"
+        else:
+            subject = f"Richat Funding Tracker — Résumé quotidien ({len(messages)} notification{'s' if len(messages) != 1 else ''})"
+            footer = f"\n\nSe désabonner : {_unsub_url(profile.user_id)}"
 
         try:
             send_mail(
                 subject=subject,
-                message=body,
+                message=body + footer,
                 from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@richat.mr"),
                 recipient_list=[profile.user.email],
                 fail_silently=False,

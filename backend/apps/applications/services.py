@@ -22,12 +22,6 @@ def _sanitize(html: str) -> str:
 
 
 def create_draft(*, user, opportunity) -> Application:
-    # Business rule: a user may hold only ONE active (non-withdrawn)
-    # application per opportunity, but may re-apply after withdrawing.
-    # The DB now enforces this with a partial unique index covering only
-    # non-withdrawn rows (see migration 0004). We still check explicitly to
-    # return a friendly error, and we catch IntegrityError as a race-safe
-    # fallback so a duplicate never escapes as a raw HTTP 500.
     if (
         Application.objects.filter(user=user, opportunity=opportunity)
         .exclude(status="withdrawn")
@@ -65,8 +59,6 @@ def submit_application(*, application: Application, user) -> Application:
     if application.status != "draft":
         raise ApplicationError("Only draft applications can be submitted.")
 
-    # Accept submission if there is either a motivation letter or at least one
-    # uploaded document — the frontend wizard supports either path.
     has_letter = bool(
         application.motivation_letter and application.motivation_letter.strip()
     )
@@ -86,12 +78,75 @@ def submit_application(*, application: Application, user) -> Application:
     return application
 
 
+def set_in_review(*, application: Application, admin_user) -> Application:
+    if application.status != "pending":
+        raise ApplicationError(
+            "Only pending applications can be moved to in-review."
+        )
+    old = application.status
+    application.status = "in_review"
+    application.save(update_fields=["status", "updated_at"])
+    _record_status_change(application, old, "in_review", admin_user)
+    return application
+
+
+def shortlist_application(*, application: Application, admin_user, comment: str = "") -> Application:
+    """Move an application into the shortlist pool.
+
+    This is the missing intermediate stage the product spec called out:
+    admins should be able to collect all candidates into a shortlist
+    BEFORE making a final approve/reject decision, rather than the old
+    flow which jumped straight from pending/in_review to approve/reject
+    with no way to hold a pool of finalists for later comparison.
+    """
+    if application.status not in ("pending", "in_review"):
+        raise ApplicationError(
+            "Only pending or in-review applications can be shortlisted."
+        )
+    old = application.status
+    application.status = "shortlisted"
+    if comment:
+        application.admin_comment = comment
+    application.save(update_fields=["status", "admin_comment", "updated_at"])
+    _record_status_change(application, old, "shortlisted", admin_user, comment)
+
+    from apps.notifications.services import create_notification
+
+    create_notification(
+        user=application.user,
+        message=f"Your application for '{application.opportunity.title}' has been shortlisted for further review.",
+        notification_type="application_status",
+        category="application",
+        priority="medium",
+    )
+    return application
+
+
+def bulk_shortlist(*, application_ids: list, admin_user) -> dict:
+    """Shortlist many applications at once — the admin's primary workflow
+    for 'collect all applicants first, then select candidates'."""
+    shortlisted = skipped = 0
+    for app_id in application_ids:
+        try:
+            app = Application.objects.get(id=app_id)
+            shortlist_application(application=app, admin_user=admin_user)
+            shortlisted += 1
+        except (Application.DoesNotExist, ApplicationError):
+            skipped += 1
+    return {"shortlisted": shortlisted, "skipped": skipped}
+
+
 def approve_application(
     *, application: Application, admin_user, comment: str = ""
 ) -> Application:
-    if application.status not in ("pending", "in_review"):
+    # Shortlisted is now a valid prior state — approving a finalist out of
+    # the shortlist pool is the expected end of the new workflow, alongside
+    # the existing direct pending/in_review → approved path for cases where
+    # an admin doesn't use the shortlist stage at all (it's optional, not
+    # mandatory, since small applicant pools may not need it).
+    if application.status not in ("pending", "in_review", "shortlisted"):
         raise ApplicationError(
-            "Only pending or in-review applications can be approved."
+            "Only pending, in-review, or shortlisted applications can be approved."
         )
 
     old = application.status
@@ -117,9 +172,9 @@ def approve_application(
 def reject_application(
     *, application: Application, admin_user, reason: str
 ) -> Application:
-    if application.status not in ("pending", "in_review"):
+    if application.status not in ("pending", "in_review", "shortlisted"):
         raise ApplicationError(
-            "Only pending or in-review applications can be rejected."
+            "Only pending, in-review, or shortlisted applications can be rejected."
         )
 
     min_length = getattr(settings, "REJECTION_REASON_MIN_LENGTH", 20)
@@ -157,18 +212,6 @@ def withdraw_application(*, application: Application, user) -> Application:
     application.status = "withdrawn"
     application.save(update_fields=["status", "updated_at"])
     _record_status_change(application, old, "withdrawn", user)
-    return application
-
-
-def set_in_review(*, application: Application, admin_user) -> Application:
-    if application.status != "pending":
-        raise ApplicationError(
-            "Only pending applications can be moved to in-review."
-        )
-    old = application.status
-    application.status = "in_review"
-    application.save(update_fields=["status", "updated_at"])
-    _record_status_change(application, old, "in_review", admin_user)
     return application
 
 

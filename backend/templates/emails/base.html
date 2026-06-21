@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html dir="{{ dir|default:'ltr' }}">
 <head>
     <meta charset="utf-8">
     <style>
@@ -11,20 +11,25 @@
         .content { padding: 32px; color: #334155; line-height: 1.6; }
         .btn { display: inline-block; background: #0f766e; color: #fff !important; text-decoration: none; padding: 12px 32px; border-radius: 8px; font-weight: 600; margin: 16px 0; }
         .footer { padding: 24px; text-align: center; color: #94a3b8; font-size: 12px; border-top: 1px solid #e2e8f0; }
+        .footer a { color: #64748b; text-decoration: underline; }
+        [dir="rtl"] .content, [dir="rtl"] .footer { text-align: right; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>Richat Funding Tracker</h1>
-            <p>Financement climatique pour les entreprises mauritaniennes</p>
+            <p>{{ footer_t.tagline }}</p>
         </div>
         <div class="content">
             {% block content %}{% endblock %}
         </div>
         <div class="footer">
-            <p>&copy; Richat Partners — Nouakchott, Mauritanie</p>
-            <p>Vous recevez cet e-mail car vous avez un compte sur Richat Funding Tracker.</p>
+            <p>{{ footer_t.copyright }}</p>
+            <p>{{ footer_t.footer_note }}</p>
+            {% if unsubscribe_url %}
+            <p><a href="{{ unsubscribe_url }}">{{ unsubscribe_label }}</a></p>
+            {% endif %}
         </div>
     </div>
 </body>

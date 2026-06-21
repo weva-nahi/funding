@@ -5,6 +5,11 @@ AFD uses the French government DSFR design system. Project cards are
 details (country, amount, period) are in ``.fr-card__detail`` paragraphs
 whose icon class identifies the field. Amount formatting is inconsistent
 (e.g. "€ 7 000 000" vs "€ 16,000,000"), so all non-digits are stripped.
+
+AFD's project list isn't pre-filterable by country via URL params on this
+listing, so every card's extracted country text is checked with
+is_mauritania_project() and non-Mauritania cards are skipped. Runs until
+the source returns an empty page.
 """
 
 import logging
@@ -22,9 +27,10 @@ class AFDScraper(BaseScraper):
     SOURCE_NAME = "AFD"
     BASE_URL = "https://www.afd.fr/en/projects/list"
 
-    def scrape(self, max_pages=5, progress_callback=None):
+    def scrape(self, progress_callback=None):
         projects = []
-        for page in range(max_pages):
+        page = 0
+        while page < self.safety_max_pages:
             url = self.BASE_URL if page == 0 else f"{self.BASE_URL}?page={page}"
             try:
                 resp = requests.get(url, headers=self.headers, timeout=30)
@@ -49,7 +55,6 @@ class AFDScraper(BaseScraper):
                     if href and not href.startswith("http"):
                         href = f"https://www.afd.fr{href}"
 
-                    # Keep only actual project pages, skip news/press cards.
                     if "/projects/" not in href and "/projet" not in href:
                         continue
                     if not title:
@@ -75,19 +80,26 @@ class AFDScraper(BaseScraper):
                         elif re.search(r"\d{4}\s*-\s*\d{4}", text):
                             period = text
 
+                    # Mauritania-only filter.
+                    if not self.keep_if_mauritania(country, title, " ".join(tags)):
+                        page_count += 1  # still counts as a "real" card seen
+                        continue
+
                     project = {
                         "title": title,
                         "url": href,
                         "source": "AFD",
                         "description": ", ".join(tags)
                         + (f" ({status})" if status else ""),
-                        "country": country,
+                        "country": "Mauritania",
+                        "city": self.extract_city(title, country, " ".join(tags)),
                         "amount": amount,
                         "currency": "EUR",
                         "metadata": {
                             "tags": tags,
                             "status": status,
                             "period": period,
+                            "raw_country": country,
                         },
                     }
                     project["sector"] = self.classify_sector(
@@ -100,14 +112,20 @@ class AFDScraper(BaseScraper):
                     project["completeness_score"] = self.calculate_completeness_score(
                         project
                     )
+
+                    if not self.has_financed_amount_and_active_deadline(project):
+                        page_count += 1
+                        continue
+
                     projects.append(project)
                     page_count += 1
 
                 if progress_callback:
-                    progress_callback(page + 1, max_pages, len(projects))
+                    progress_callback(page + 1, None, len(projects))
                 if page_count == 0:
                     break
                 self.sleep()
+                page += 1
 
             except Exception as e:  # noqa: BLE001
                 logger.error(f"AFD scraping error page {page}: {e}")

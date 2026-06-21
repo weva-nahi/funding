@@ -16,3 +16,7 @@ def get_audit_logs(*, user_id=None, action=None, model_name=None, date_from=None
     if date_to:
         qs = qs.filter(timestamp__lte=date_to)
     return qs.order_by("-timestamp")
+
+
+def get_audit_log_by_id(*, log_id: int):
+    return AuditLog.objects.select_related("user").get(id=log_id)

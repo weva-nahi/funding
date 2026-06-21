@@ -23,12 +23,12 @@ class ClimateFundScraper(BaseScraper):
     SOURCE_NAME = "CLIMATE_FUND"
     BASE_URL = "https://climatefundsupdate.org/data-dashboard/"
 
-    def scrape(self, max_pages=5, progress_callback=None):
+    def scrape(self, progress_callback=None):
         logger.warning(
             "Climate Funds Update: dashboard is a Tableau embed with no "
             "scrapable per-opportunity data. Skipping. Use an Excel import "
             "flow for CFU fund-level statistics instead."
         )
         if progress_callback:
-            progress_callback(1, 1, 0)
+            progress_callback(1, None, 0)
         return []

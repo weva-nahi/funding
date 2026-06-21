@@ -69,6 +69,12 @@ class Profile(TimestampMixin):
         ("daily", "Daily Digest"),
     ]
 
+    LANGUAGE_CHOICES = [
+        ("fr", "Français"),
+        ("en", "English"),
+        ("ar", "العربية"),
+    ]
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     first_name = models.CharField(max_length=100, blank=True)
     last_name = models.CharField(max_length=100, blank=True)
@@ -89,6 +95,17 @@ class Profile(TimestampMixin):
         max_length=10,
         choices=NOTIFY_FREQUENCY_CHOICES,
         default="immediate",
+    )
+
+    # Language the user wants transactional emails sent in. Defaults to
+    # 'fr' to preserve current behavior for existing accounts (all current
+    # emails are hardcoded French). New registrations set this from either
+    # an explicit `language` field on the signup form or, if omitted, the
+    # browser's Accept-Language header (see authentication/services.py).
+    preferred_language = models.CharField(
+        max_length=2,
+        choices=LANGUAGE_CHOICES,
+        default="fr",
     )
 
     pending_digest = models.JSONField(default=list, blank=True)

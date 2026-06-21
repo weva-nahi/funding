@@ -21,5 +21,12 @@ jobs:
             docker compose -f docker-compose.prod.yml build
             docker compose -f docker-compose.prod.yml down
             docker compose -f docker-compose.prod.yml up -d
-            docker compose exec -T backend python manage.py migrate
-            docker compose exec -T backend python manage.py collectstatic --noinput
+            # migrate + collectstatic also run automatically on backend
+            # container startup (see backend command in
+            # docker-compose.prod.yml), so running them again here is
+            # redundant but harmless — Django migrations and collectstatic
+            # are both idempotent. Running them explicitly here too gives
+            # a clearer CI log of exactly what ran during this deploy,
+            # rather than relying solely on container startup logs.
+            docker compose -f docker-compose.prod.yml exec -T backend python manage.py migrate --noinput
+            docker compose -f docker-compose.prod.yml exec -T backend python manage.py collectstatic --noinput

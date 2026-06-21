@@ -28,6 +28,7 @@ class PublicOpportunityListView(APIView):
             search=request.query_params.get("search"),
             source=request.query_params.get("source"),
             country=request.query_params.get("country"),
+            city=request.query_params.get("city"),
             amount_min=request.query_params.get("amount_min"),
             amount_max=request.query_params.get("amount_max"),
             funding_type=request.query_params.get("funding_type"),
@@ -38,6 +39,10 @@ class PublicOpportunityListView(APIView):
         paginator = StandardPagination()
         page = paginator.paginate_queryset(opportunities, request)
 
+        # N+1 fix: resolve every saved-id for the current user in ONE query
+        # up front (get_saved_opportunity_ids), then pass it through
+        # serializer context so get_is_saved() can do an in-memory set
+        # lookup per row instead of issuing a fresh query per opportunity.
         saved_ids = None
         if request.user and request.user.is_authenticated:
             saved_ids = selectors.get_saved_opportunity_ids(user=request.user)
@@ -102,8 +107,17 @@ class AdminOpportunityListView(APIView):
         )
         paginator = StandardPagination()
         page = paginator.paginate_queryset(opportunities, request)
+
+        # Same N+1 fix as the public list view — this was the one place
+        # still missing it, since admins ARE authenticated users who can
+        # also save opportunities, so get_is_saved() was silently falling
+        # back to a per-row query for every admin list page-load.
+        saved_ids = selectors.get_saved_opportunity_ids(user=request.user)
+
         return paginator.get_paginated_response(
-            FundingOpportunityListSerializer(page, many=True, context={"request": request}).data
+            FundingOpportunityListSerializer(
+                page, many=True, context={"request": request, "saved_ids": saved_ids}
+            ).data
         )
 
     @extend_schema(request=OpportunityCreateSerializer, responses={201: FundingOpportunitySerializer}, tags=["Opportunities"])
@@ -132,7 +146,9 @@ class AdminOpportunityDetailView(APIView):
         opportunity = selectors.get_opportunity_by_id(opportunity_id=pk)
         serializer = OpportunityUpdateSerializer(opportunity, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        opportunity = services.update_opportunity(opportunity=opportunity, **serializer.validated_data)
+        opportunity = services.update_opportunity(
+            opportunity=opportunity, editor=request.user, **serializer.validated_data
+        )
         return Response(
             FundingOpportunitySerializer(opportunity, context={"request": request}).data
         )

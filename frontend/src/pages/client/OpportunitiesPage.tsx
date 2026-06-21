@@ -5,8 +5,8 @@ import api from '@/lib/axios'
 import { useDebounce } from '@/hooks/useDebounce'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { formatDate, daysUntil } from '@/utils/formatDate'
-import { SOURCES, FUNDING_TYPES } from '@/lib/constants'
-import { Search, Globe, Calendar, DollarSign, Bookmark, BookmarkCheck, Filter, X } from 'lucide-react'
+import { SOURCES, FUNDING_TYPES, MAURITANIA_CITIES, SECTORS, AMOUNT_STEP } from '@/lib/constants'
+import { Search, Globe, Calendar, DollarSign, Bookmark, BookmarkCheck, Filter, X, MapPin } from 'lucide-react'
 import type { Opportunity, Paginated } from '@/types'
 
 export function OpportunitiesPage() {
@@ -16,7 +16,7 @@ export function OpportunitiesPage() {
   const [search, setSearch] = useState('')
   const [source, setSource] = useState('')
   const [fundingType, setFundingType] = useState('')
-  const [country, setCountry] = useState('')
+  const [city, setCity] = useState('')
   const [sector, setSector] = useState('')
   const [amountMin, setAmountMin] = useState('')
   const [amountMax, setAmountMax] = useState('')
@@ -27,11 +27,10 @@ export function OpportunitiesPage() {
   const debouncedSearch = useDebounce(search)
   const queryClient = useQueryClient()
 
-  // Main opportunities list OR saved list
   const { data, isLoading, isError } = useQuery<Paginated<Opportunity>>({
     queryKey: savedTab
       ? ['opportunities-saved', page]
-      : ['opportunities', debouncedSearch, source, fundingType, country, sector, amountMin, amountMax, hasDeadline, page],
+      : ['opportunities', debouncedSearch, source, fundingType, city, sector, amountMin, amountMax, hasDeadline, page],
     queryFn: () => {
       if (savedTab) {
         return api.get('/opportunities/saved/', { params: { page } }).then(r => r.data)
@@ -41,7 +40,7 @@ export function OpportunitiesPage() {
           search: debouncedSearch || undefined,
           source: source || undefined,
           funding_type: fundingType || undefined,
-          country: country || undefined,
+          city: city || undefined,
           sector: sector || undefined,
           amount_min: amountMin || undefined,
           amount_max: amountMax || undefined,
@@ -71,19 +70,19 @@ export function OpportunitiesPage() {
   }
 
   const resetFilters = () => {
-    setSearch(''); setSource(''); setFundingType(''); setCountry('')
+    setSearch(''); setSource(''); setFundingType(''); setCity('')
     setSector(''); setAmountMin(''); setAmountMax(''); setHasDeadline(false)
     setPage(1)
   }
 
-  const hasActiveFilters = search || source || fundingType || country || sector || amountMin || amountMax || hasDeadline
+  const hasActiveFilters = search || source || fundingType || city || sector || amountMin || amountMax || hasDeadline
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Funding Opportunities</h1>
-          <p className="text-muted-foreground mt-1">Browse and apply for international climate funding</p>
+          <p className="text-muted-foreground mt-1">Browse and apply for climate funding in Mauritania</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -100,12 +99,12 @@ export function OpportunitiesPage() {
 
       {!savedTab && (
         <div className="space-y-3">
-          <div className="flex gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <div className="flex flex-wrap gap-3">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input type="text" placeholder="Search opportunities..." value={search}
                 onChange={e => { setSearch(e.target.value); setPage(1) }}
-                className="w-full rounded-lg border pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                className="w-full rounded-lg border ps-10 pe-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
             </div>
             <select value={source} onChange={e => { setSource(e.target.value); setPage(1) }}
               className="rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white">
@@ -132,26 +131,32 @@ export function OpportunitiesPage() {
             <div className="rounded-xl border bg-white p-4 shadow-sm space-y-3">
               <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">Country</label>
-                  <input type="text" placeholder="e.g. Mauritania" value={country}
-                    onChange={e => { setCountry(e.target.value); setPage(1) }}
-                    className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                  <label className="block text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                    <MapPin className="h-3 w-3" /> City / Region
+                  </label>
+                  <select value={city} onChange={e => { setCity(e.target.value); setPage(1) }}
+                    className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white">
+                    <option value="">All Mauritania</option>
+                    {MAURITANIA_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">Sector</label>
-                  <input type="text" placeholder="e.g. energy, water" value={sector}
-                    onChange={e => { setSector(e.target.value); setPage(1) }}
-                    className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                  <select value={sector} onChange={e => { setSector(e.target.value); setPage(1) }}
+                    className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white">
+                    <option value="">All Sectors</option>
+                    {SECTORS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">Min Amount (USD)</label>
-                  <input type="number" placeholder="0" value={amountMin}
+                  <input type="number" step={AMOUNT_STEP} placeholder="0" value={amountMin}
                     onChange={e => { setAmountMin(e.target.value); setPage(1) }}
                     className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">Max Amount (USD)</label>
-                  <input type="number" placeholder="∞" value={amountMax}
+                  <input type="number" step={AMOUNT_STEP} placeholder="∞" value={amountMax}
                     onChange={e => { setAmountMax(e.target.value); setPage(1) }}
                     className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
@@ -202,11 +207,10 @@ export function OpportunitiesPage() {
                 return (
                   <Link key={opp.id} to={`/opportunities/${opp.id}`}
                     className="group relative rounded-xl border bg-white p-6 shadow-sm hover:shadow-lg hover:border-primary/30 transition-all">
-                    {/* Save/unsave button */}
                     <button
                       onClick={(e) => toggleSaved(opp, e)}
                       disabled={saveMutation.isPending}
-                      className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-muted transition-colors"
+                      className="absolute top-4 end-4 p-1.5 rounded-full hover:bg-muted transition-colors"
                       title={opp.is_saved ? 'Remove from saved' : 'Save for later'}
                     >
                       {opp.is_saved
@@ -215,7 +219,7 @@ export function OpportunitiesPage() {
                       }
                     </button>
 
-                    <div className="flex items-center gap-2 mb-3 pr-8">
+                    <div className="flex items-center gap-2 mb-3 pe-8">
                       <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">{opp.source}</span>
                       {opp.funding_type && (
                         <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">{opp.funding_type}</span>
@@ -224,7 +228,10 @@ export function OpportunitiesPage() {
                     <h3 className="font-semibold line-clamp-2 group-hover:text-primary transition-colors">{opp.title}</h3>
                     <div className="mt-4 space-y-2 text-sm text-muted-foreground">
                       {opp.amount != null && (
-                        <div className="flex items-center gap-2"><DollarSign className="h-3.5 w-3.5" />{formatCurrency(opp.amount, opp.currency)}</div>
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="h-3.5 w-3.5" />
+                          <span className="ltr-numeric">{formatCurrency(opp.amount, opp.currency)}</span>
+                        </div>
                       )}
                       {opp.deadline && (
                         <div className="flex items-center gap-2">
@@ -234,14 +241,10 @@ export function OpportunitiesPage() {
                           </span>
                         </div>
                       )}
-                      {opp.country && <div className="flex items-center gap-2"><Globe className="h-3.5 w-3.5" />{opp.country}</div>}
-                    </div>
-                    <div className="mt-4">
-                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full transition-all"
-                          style={{ width: `${opp.completeness_score}%` }} />
+                      <div className="flex items-center gap-2">
+                        <Globe className="h-3.5 w-3.5" />
+                        {opp.city ? `${opp.city}, Mauritania` : 'Mauritania'}
                       </div>
-                      <p className="text-[10px] text-muted-foreground mt-1">{opp.completeness_score}% complete</p>
                     </div>
                   </Link>
                 )

@@ -34,7 +34,7 @@ class OECDScraper(BaseScraper):
         )
         return webdriver.Chrome(service=service, options=options)
 
-    def scrape(self, max_pages=5, progress_callback=None):
+    def scrape(self, progress_callback=None):
         try:
             from selenium.webdriver.common.by import By
             from selenium.webdriver.support import expected_conditions as EC
@@ -42,22 +42,20 @@ class OECDScraper(BaseScraper):
         except Exception as e:  # noqa: BLE001
             logger.error(f"OECD scraper: Selenium unavailable ({e}). Skipping.")
             if progress_callback:
-                progress_callback(1, 1, 0)
+                progress_callback(1, None, 0)
             return []
 
         projects = []
         driver = None
         try:
             driver = self._setup_driver()
-            for page in range(max_pages):
-                params = f"?orderBy=mostRelevant&page={page}"
-                if self.COUNTRY_FACET:
-                    params += f"&facetTags={self.COUNTRY_FACET}"
+            page = 0
+            while page < self.safety_max_pages:
+                params = f"?orderBy=mostRelevant&page={page}&facetTags={self.COUNTRY_FACET}"
                 url = f"{self.BASE_URL}{params}"
 
                 try:
                     driver.get(url)
-                    # Increased from 20s to 45s — OECD can be slow.
                     WebDriverWait(driver, 45).until(
                         EC.presence_of_element_located(
                             (By.CSS_SELECTOR, "article.search-result-list-item")
@@ -99,12 +97,18 @@ class OECDScraper(BaseScraper):
                         snippet_el.get_text(" ", strip=True) if snippet_el else ""
                     )
 
+                    # Defensive re-check even though the facet already
+                    # restricts to Mauritania.
+                    if not self.keep_if_mauritania(title, snippet, "Mauritania"):
+                        continue
+
                     project = {
                         "title": title,
                         "url": href,
                         "source": "OECD",
                         "description": snippet[:1500],
-                        "country": "Mauritania" if self.COUNTRY_FACET else "",
+                        "country": "Mauritania",
+                        "city": self.extract_city(title, snippet),
                         "currency": "USD",
                         "metadata": {
                             "content_type": content_type,
@@ -115,11 +119,16 @@ class OECDScraper(BaseScraper):
                     project["funding_type"] = self.classify_funding_type(f"{title} {snippet}")
                     project["hash"] = self.generate_hash(title, href, "")
                     project["completeness_score"] = self.calculate_completeness_score(project)
+
+                    if not self.has_financed_amount_and_active_deadline(project):
+                        continue
+
                     projects.append(project)
 
                 if progress_callback:
-                    progress_callback(page + 1, max_pages, len(projects))
+                    progress_callback(page + 1, None, len(projects))
                 self.sleep()
+                page += 1
 
         except Exception as e:  # noqa: BLE001
             logger.error(f"OECD scraping error: {e}")

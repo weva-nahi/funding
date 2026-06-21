@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '@/lib/axios'
 import { formatRelativeDate } from '@/utils/formatDate'
 import { APPLICATION_STATUSES } from '@/lib/constants'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { ArrowLeft, Download, Clock } from 'lucide-react'
 import type { Application, ApplicationDocument } from '@/types'
 
@@ -10,6 +12,7 @@ export function ApplicationDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [confirmWithdraw, setConfirmWithdraw] = useState(false)
 
   const { data: app, isLoading } = useQuery<Application>({
     queryKey: ['application', id],
@@ -24,13 +27,15 @@ export function ApplicationDetailPage() {
 
   const withdrawMutation = useMutation({
     mutationFn: () => api.post(`/applications/${id}/withdraw/`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['application', id] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['application', id] })
+      setConfirmWithdraw(false)
+    },
   })
 
   const getSignedUrl = async (docId: number, filename: string) => {
     try {
       const res = await api.get(`/documents/${docId}/signed-url/`)
-      // Use a relative URL — the proxy / nginx routes it correctly
       const downloadUrl = res.data.url
       const a = document.createElement('a')
       a.href = downloadUrl
@@ -57,7 +62,7 @@ export function ApplicationDetailPage() {
   return (
     <div className="max-w-4xl space-y-6 animate-fade-in">
       <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" /> Back
+        <ArrowLeft className="h-4 w-4 rtl:rotate-180" /> Back
       </button>
 
       <div className="rounded-xl border bg-white shadow-sm">
@@ -119,7 +124,7 @@ export function ApplicationDetailPage() {
           {(app.status_history?.length ?? 0) > 0 && (
             <div>
               <h3 className="text-sm font-semibold mb-3">Timeline</h3>
-              <div className="space-y-4 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-muted">
+              <div className="space-y-4 relative before:absolute before:start-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-muted">
                 {app.status_history?.map((entry) => (
                   <div key={entry.id} className="flex gap-4 relative">
                     <div className="h-6 w-6 rounded-full bg-primary/20 flex items-center justify-center z-10 mt-0.5">
@@ -143,14 +148,10 @@ export function ApplicationDetailPage() {
             </div>
           )}
 
-          {['draft', 'pending', 'in_review'].includes(app.status) && (
+          {['draft', 'pending', 'in_review', 'shortlisted'].includes(app.status) && (
             <div className="pt-4 border-t">
               <button
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to withdraw this application?')) {
-                    withdrawMutation.mutate()
-                  }
-                }}
+                onClick={() => setConfirmWithdraw(true)}
                 disabled={withdrawMutation.isPending}
                 className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">
                 {withdrawMutation.isPending ? 'Withdrawing...' : 'Withdraw Application'}
@@ -159,6 +160,17 @@ export function ApplicationDetailPage() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmWithdraw}
+        title="Withdraw this application?"
+        message="You will no longer be considered for this opportunity. You can re-apply later if the deadline hasn't passed."
+        variant="warning"
+        confirmLabel="Withdraw"
+        isLoading={withdrawMutation.isPending}
+        onConfirm={() => withdrawMutation.mutate()}
+        onCancel={() => setConfirmWithdraw(false)}
+      />
     </div>
   )
 }

@@ -31,6 +31,14 @@ class TokenSerializer(serializers.Serializer):
     refresh = serializers.CharField()
 
 
+class ResendVerificationSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class UnsubscribeSerializer(serializers.Serializer):
+    token = serializers.CharField()
+
+
 class ProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source="user.email", read_only=True)
     role = serializers.CharField(source="user.role", read_only=True)
@@ -47,6 +55,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             "phone",
             "avatar",
             "sector",
+            "preferred_language",
             "notify_application_status",
             "notify_new_opportunities",
             "notify_consulting_response",

@@ -12,6 +12,8 @@ urlpatterns = [
     path("<int:pk>/withdraw/", views.WithdrawApplicationView.as_view(), name="withdraw"),
     # Admin
     path("admin/", views.AdminApplicationListView.as_view(), name="admin-list"),
+    path("admin/shortlist/", views.AdminShortlistView.as_view(), name="admin-shortlist"),
+    path("admin/bulk-shortlist/", views.BulkShortlistView.as_view(), name="bulk-shortlist"),
     path("admin/<int:pk>/", views.AdminApplicationDetailView.as_view(), name="admin-detail"),
     path("admin/<int:pk>/review/", views.ReviewApplicationView.as_view(), name="review"),
     path("admin/bulk-review/", views.BulkReviewView.as_view(), name="bulk-review"),

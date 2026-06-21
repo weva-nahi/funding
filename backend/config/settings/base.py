@@ -96,6 +96,21 @@ DATABASES = {
     }
 }
 
+# ─── Redis usage map ────────────────────────────────────────────────────────
+# Richat uses ONE Redis instance, logically partitioned by DB index for four
+# distinct purposes. This is intentional and documented here so the "Redis is
+# shared for 4 purposes" concern is understood rather than silently shared:
+#   DB 1 -> Celery broker      (CELERY_BROKER_URL)
+#   DB 2 -> Celery result backend (CELERY_RESULT_BACKEND)
+#   DB 3 -> Django Channels layer (CHANNEL_LAYERS_BACKEND)
+#   DB 4 -> Django cache / token cache (REDIS_CACHE_URL)
+# If Redis becomes a single point of failure in production, the recommended
+# upgrade path is to split DB 1/2 (Celery) onto a separate Redis instance
+# (or managed broker) from DB 3/4 (Channels + cache), since a Celery broker
+# outage and a cache outage have very different blast radii. The application
+# already supports this today — just point each *_URL env var at a different
+# host. No code changes are required to make that split; only the four
+# environment variables below need to change in `.env`.
 REDIS_CACHE_URL = os.environ.get("REDIS_CACHE_URL", "redis://redis:6379/4")
 CACHES = {
     "default": {
@@ -133,6 +148,7 @@ REST_FRAMEWORK = {
         "anon": "30/minute",
         "user": "100/minute",
         "login": "5/minute",
+        "signup": "5/hour",
         "upload": "20/hour",
     },
     "EXCEPTION_HANDLER": "common.exceptions.custom_exception_handler",
@@ -180,6 +196,14 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.notifications.tasks.send_daily_digests",
         "schedule": crontab(hour=8, minute=0),
     },
+    "cleanup-expired-auth-tokens": {
+        "task": "apps.authentication.tasks.cleanup_expired_tokens",
+        "schedule": crontab(hour=3, minute=0),
+    },
+    "cleanup-old-audit-logs": {
+        "task": "apps.audit.tasks.cleanup_old_audit_logs",
+        "schedule": crontab(hour=4, minute=0),
+    },
 }
 
 SPECTACULAR_SETTINGS = {
@@ -224,7 +248,22 @@ ALLOWED_FILE_TYPES = os.environ.get(
     "image/jpeg,image/png",
 ).split(",")
 
+# ─── Image upload / decompression-bomb protection ──────────────────────────
+# A "decompression bomb" is a small file (e.g. a few KB) that decodes into an
+# enormous pixel grid (e.g. 50000x50000px), causing Pillow to allocate
+# gigabytes of RAM when it's opened/processed — a trivial DoS vector for any
+# endpoint that accepts image uploads. MAX_IMAGE_PIXELS caps the allowed
+# width*height BEFORE Pillow decodes the full image, and
+# MAX_IMAGE_DIMENSION_PX caps each side independently.
+MAX_IMAGE_PIXELS = int(os.environ.get("MAX_IMAGE_PIXELS", 25_000_000))  # ~5000x5000
+MAX_IMAGE_DIMENSION_PX = int(os.environ.get("MAX_IMAGE_DIMENSION_PX", 8000))
+
 SCRAPING_DELAY_SECONDS = int(os.environ.get("SCRAPING_DELAY_SECONDS", 2))
+# NOTE: SCRAPING_MAX_PAGES_DEFAULT is intentionally no longer used as a hard
+# cap by the scrapers (see apps/scraping/services.py) — scraping now runs
+# until the source itself is exhausted, restricted only to Mauritania.
+# Retained here only as a legacy default for any external caller that still
+# passes max_pages explicitly.
 SCRAPING_MAX_PAGES_DEFAULT = int(os.environ.get("SCRAPING_MAX_PAGES_DEFAULT", 5))
 CHROME_BINARY_PATH = os.environ.get("CHROME_BINARY_PATH", "/usr/bin/chromium")
 CHROMEDRIVER_PATH = os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
@@ -237,3 +276,7 @@ SIGNED_URL_EXPIRY_SECONDS = int(os.environ.get("SIGNED_URL_EXPIRY_SECONDS", 3600
 REJECTION_REASON_MIN_LENGTH = 20
 PROCESSING_TIME_SAMPLE_LIMIT = 500
 DEADLINE_REMINDER_DAYS = [7, 1]
+
+# ─── Token / audit-log retention ────────────────────────────────────────────
+AUTH_TOKEN_RETENTION_DAYS = int(os.environ.get("AUTH_TOKEN_RETENTION_DAYS", 7))
+AUDIT_LOG_RETENTION_MONTHS = int(os.environ.get("AUDIT_LOG_RETENTION_MONTHS", 6))

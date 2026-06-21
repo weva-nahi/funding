@@ -1,12 +1,19 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/axios'
 import { extractError } from '@/utils/extractError'
 import { useDropzone } from 'react-dropzone'
 import { validateFile } from '@/utils/validateFile'
-import { FileText, Upload, ArrowLeft, Send, Trash2 } from 'lucide-react'
+import { CharCounter } from '@/components/CharCounter'
+import { FileText, Upload, ArrowLeft, Send, Trash2, RotateCcw } from 'lucide-react'
 import type { Opportunity } from '@/types'
+
+const MOTIVATION_MAX_LENGTH = 5000
+
+function draftKey(applicationId: number | null): string {
+  return `richat:draft-letter:${applicationId ?? 'pending'}`
+}
 
 export function NewApplicationPage() {
   const { id } = useParams()
@@ -17,17 +24,56 @@ export function NewApplicationPage() {
   const [files, setFiles] = useState<File[]>([])
   const [appId, setAppId] = useState<number | null>(null)
   const [error, setError] = useState('')
+  const [restoredDraft, setRestoredDraft] = useState(false)
 
   const { data: opp } = useQuery<Opportunity>({
     queryKey: ['opportunity', id],
     queryFn: () => api.get(`/opportunities/${id}/`).then(r => r.data),
   })
 
+  // Restore an in-progress motivation letter draft if the user navigated
+  // away and came back — fixes "draft application progress is lost when
+  // the user leaves and comes back". Keyed by application id once one
+  // exists, so drafts don't bleed across different applications.
+  useEffect(() => {
+    const saved = localStorage.getItem(draftKey(appId))
+    if (saved && saved !== letter) {
+      setLetter(saved)
+      setRestoredDraft(true)
+    }
+    // Only run when appId changes (i.e. once we know which draft to load) —
+    // not on every `letter` change, which would re-trigger this constantly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appId])
+
+  // Persist on every keystroke (debounced by the browser's natural typing
+  // cadence — localStorage writes are cheap enough not to need throttling
+  // here given the realistic input size).
+  useEffect(() => {
+    if (step !== 2) return
+    if (letter) {
+      localStorage.setItem(draftKey(appId), letter)
+    } else {
+      localStorage.removeItem(draftKey(appId))
+    }
+  }, [letter, appId, step])
+
   const createMutation = useMutation({
     mutationFn: () => api.post('/applications/', { opportunity_id: parseInt(id!) }),
     onSuccess: (res) => {
       setError('')
-      setAppId(res.data.id)
+      const newAppId = res.data.id
+      setAppId(newAppId)
+
+      // Migrate any draft saved under the "pending" key (before the
+      // application existed) to the now-known application id, so it's
+      // still found on next restore.
+      const pendingDraft = localStorage.getItem(draftKey(null))
+      if (pendingDraft) {
+        localStorage.setItem(draftKey(newAppId), pendingDraft)
+        localStorage.removeItem(draftKey(null))
+      }
+
       setStep(2)
     },
     onError: (err: unknown) => {
@@ -57,6 +103,9 @@ export function NewApplicationPage() {
       await api.post(`/applications/${appId}/submit/`)
     },
     onSuccess: () => {
+      // Submission succeeded — clear the local draft so it doesn't resurface
+      // on a future, unrelated application.
+      localStorage.removeItem(draftKey(appId))
       queryClient.invalidateQueries({ queryKey: ['my-applications'] })
       navigate('/applications')
     },
@@ -84,8 +133,14 @@ export function NewApplicationPage() {
   })
 
   const goToStep = (n: number) => {
-    setError('')  // Reset error state between steps
+    setError('')
     setStep(n)
+  }
+
+  const discardDraft = () => {
+    localStorage.removeItem(draftKey(appId))
+    setLetter('')
+    setRestoredDraft(false)
   }
 
   const steps = [{ num: 1, label: 'Start' }, { num: 2, label: 'Motivation' }, { num: 3, label: 'Documents' }]
@@ -129,10 +184,26 @@ export function NewApplicationPage() {
           <div className="space-y-4">
             <h2 className="text-lg font-semibold">Motivation Letter</h2>
             <p className="text-sm text-muted-foreground">Explain why your organization is a good fit for this funding.</p>
-            <textarea value={letter} onChange={e => setLetter(e.target.value)} rows={10}
+
+            {restoredDraft && (
+              <div className="flex items-center justify-between rounded-lg bg-blue-50 border border-blue-200 px-4 py-2.5">
+                <p className="text-xs text-blue-700">We restored your previously unsaved draft.</p>
+                <button onClick={discardDraft} className="flex items-center gap-1 text-xs font-medium text-blue-700 hover:text-blue-900">
+                  <RotateCcw className="h-3 w-3" /> Discard
+                </button>
+              </div>
+            )}
+
+            <textarea
+              value={letter}
+              onChange={e => setLetter(e.target.value.slice(0, MOTIVATION_MAX_LENGTH))}
+              rows={10}
               placeholder="Write your motivation letter..."
-              className="w-full rounded-lg border p-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" />
-            <p className="text-xs text-muted-foreground">{letter.length} characters</p>
+              className="w-full rounded-lg border p-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+            />
+            <div className="flex justify-end">
+              <CharCounter current={letter.length} max={MOTIVATION_MAX_LENGTH} />
+            </div>
             <div className="flex gap-3 justify-end">
               <button onClick={() => updateMutation.mutate()} disabled={!letter.trim() || updateMutation.isPending}
                 className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50">

@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import api from '@/lib/axios'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { formatDate, daysUntil } from '@/utils/formatDate'
-import { Globe, Calendar, DollarSign, ArrowLeft, ExternalLink, FileText, Bookmark, BookmarkCheck } from 'lucide-react'
+import { Globe, Calendar, DollarSign, ArrowLeft, ExternalLink, FileText, Bookmark, BookmarkCheck, MapPin } from 'lucide-react'
 import type { Opportunity } from '@/types'
 
 export function OpportunityDetailPage() {
@@ -43,7 +43,7 @@ export function OpportunityDetailPage() {
   return (
     <div className="space-y-6 animate-fade-in max-w-4xl">
       <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        <ArrowLeft className="h-4 w-4" /> Back
+        <ArrowLeft className="h-4 w-4 rtl:rotate-180" /> Back
       </button>
 
       <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
@@ -61,7 +61,7 @@ export function OpportunityDetailPage() {
             {opp.amount != null && (
               <div className="rounded-lg bg-muted/50 p-4">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1"><DollarSign className="h-4 w-4" />Amount</div>
-                <p className="text-lg font-bold">{formatCurrency(opp.amount, opp.currency)}</p>
+                <p className="text-lg font-bold ltr-numeric">{formatCurrency(opp.amount, opp.currency)}</p>
               </div>
             )}
             {opp.deadline && (
@@ -71,12 +71,10 @@ export function OpportunityDetailPage() {
                 {days != null && <p className="text-xs text-muted-foreground">{days <= 0 ? 'Expired' : `${days} days remaining`}</p>}
               </div>
             )}
-            {opp.country && (
-              <div className="rounded-lg bg-muted/50 p-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1"><Globe className="h-4 w-4" />Country</div>
-                <p className="text-lg font-bold">{opp.country}</p>
-              </div>
-            )}
+            <div className="rounded-lg bg-muted/50 p-4">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1"><MapPin className="h-4 w-4" />Location</div>
+              <p className="text-lg font-bold">{opp.city ? `${opp.city}, Mauritania` : 'Mauritania'}</p>
+            </div>
           </div>
 
           {opp.description && (
@@ -100,15 +98,6 @@ export function OpportunityDetailPage() {
             </div>
           )}
 
-          <div>
-            <h3 className="text-sm font-semibold mb-2">Data Completeness</h3>
-            <div className="h-2 rounded-full bg-muted overflow-hidden max-w-xs">
-              <div className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full"
-                style={{ width: `${opp.completeness_score}%` }} />
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">{opp.completeness_score}% complete</p>
-          </div>
-
           <div className="flex flex-wrap gap-3 pt-4 border-t">
             {!opp.is_expired && (
               <Link to={`/opportunities/${id}/apply`}
@@ -116,7 +105,6 @@ export function OpportunityDetailPage() {
                 <FileText className="h-4 w-4" /> Apply Now
               </Link>
             )}
-            {/* Save for later button */}
             <button
               onClick={() => saveMutation.mutate(!opp.is_saved)}
               disabled={saveMutation.isPending}

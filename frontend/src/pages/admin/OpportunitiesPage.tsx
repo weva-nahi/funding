@@ -5,12 +5,14 @@ import api from '@/lib/axios'
 import { formatDate } from '@/utils/formatDate'
 import { Search, Plus, Edit, Globe } from 'lucide-react'
 import { useDebounce } from '@/hooks/useDebounce'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import type { Opportunity, Paginated } from '@/types'
 
 export function AdminOpportunitiesPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
+  const [confirmPublish, setConfirmPublish] = useState<Opportunity | null>(null)
   const debouncedSearch = useDebounce(search)
   const queryClient = useQueryClient()
 
@@ -23,7 +25,10 @@ export function AdminOpportunitiesPage() {
 
   const publishMutation = useMutation({
     mutationFn: (id: number) => api.post(`/opportunities/admin/${id}/publish/`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-opportunities'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-opportunities'] })
+      setConfirmPublish(null)
+    },
   })
 
   return (
@@ -41,10 +46,10 @@ export function AdminOpportunitiesPage() {
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input type="text" placeholder="Search titles..." value={search}
             onChange={e => { setSearch(e.target.value); setPage(1) }}
-            className="w-full rounded-lg border pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+            className="w-full rounded-lg border ps-10 pe-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
         </div>
         <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
           className="rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white">
@@ -57,15 +62,15 @@ export function AdminOpportunitiesPage() {
 
       <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
+          <table className="w-full text-sm text-start">
             <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="px-6 py-3 font-medium">Title</th>
                 <th className="px-6 py-3 font-medium">Source</th>
+                <th className="px-6 py-3 font-medium">City</th>
                 <th className="px-6 py-3 font-medium">Deadline</th>
                 <th className="px-6 py-3 font-medium">Status</th>
-                <th className="px-6 py-3 font-medium">Completeness</th>
-                <th className="px-6 py-3 font-medium text-right">Actions</th>
+                <th className="px-6 py-3 font-medium text-end">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -80,6 +85,7 @@ export function AdminOpportunitiesPage() {
                   <tr key={opp.id} className="border-b last:border-0 hover:bg-muted/20">
                     <td className="px-6 py-4 font-medium max-w-[250px] truncate" title={opp.title}>{opp.title}</td>
                     <td className="px-6 py-4">{opp.source}</td>
+                    <td className="px-6 py-4 text-muted-foreground">{opp.city || '—'}</td>
                     <td className="px-6 py-4 whitespace-nowrap">{formatDate(opp.deadline ?? null)}</td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
@@ -88,22 +94,11 @@ export function AdminOpportunitiesPage() {
                         'bg-amber-100 text-amber-700'
                       }`}>{opp.status}</span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-16 rounded-full bg-muted overflow-hidden">
-                          <div className={`h-full rounded-full ${
-                            opp.completeness_score >= 80 ? 'bg-emerald-500' :
-                            opp.completeness_score >= 50 ? 'bg-amber-500' : 'bg-red-500'
-                          }`} style={{ width: `${opp.completeness_score}%` }} />
-                        </div>
-                        <span className="text-xs text-muted-foreground">{opp.completeness_score}%</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-end">
                       <div className="flex items-center justify-end gap-3">
                         {opp.status === 'draft' && (
-                          <button onClick={() => publishMutation.mutate(opp.id)} disabled={publishMutation.isPending}
-                            className="text-xs text-emerald-600 hover:underline font-medium disabled:opacity-50 flex items-center gap-1">
+                          <button onClick={() => setConfirmPublish(opp)}
+                            className="text-xs text-emerald-600 hover:underline font-medium flex items-center gap-1">
                             <Globe className="h-3.5 w-3.5" /> Publish
                           </button>
                         )}
@@ -126,6 +121,16 @@ export function AdminOpportunitiesPage() {
           <button onClick={() => setPage(p => p + 1)} disabled={!data?.next} className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50">Next</button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmPublish}
+        title="Publish this opportunity?"
+        message={`"${confirmPublish?.title}" will become visible to all clients immediately, and its amount/deadline will be locked from further edits to maintain transparency for applicants.`}
+        confirmLabel="Publish"
+        isLoading={publishMutation.isPending}
+        onConfirm={() => confirmPublish && publishMutation.mutate(confirmPublish.id)}
+        onCancel={() => setConfirmPublish(null)}
+      />
     </div>
   )
 }

@@ -5,9 +5,9 @@ from .models import FundingOpportunity, SavedOpportunity
 
 @admin.register(FundingOpportunity)
 class FundingOpportunityAdmin(admin.ModelAdmin):
-    list_display = ["title", "source", "amount", "deadline", "status", "completeness_score"]
-    list_filter = ["source", "status", "funding_type"]
-    search_fields = ["title", "description"]
+    list_display = ["title", "source", "country", "city", "amount", "deadline", "status", "completeness_score"]
+    list_filter = ["source", "status", "funding_type", "city"]
+    search_fields = ["title", "description", "city"]
 
 
 @admin.register(SavedOpportunity)

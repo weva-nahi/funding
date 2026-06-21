@@ -1,14 +1,20 @@
 import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Eye, EyeOff, Save, CheckCircle, Lock, Camera } from 'lucide-react'
+import { Eye, EyeOff, Save, CheckCircle, Lock, Camera, Mail } from 'lucide-react'
 import api from '@/lib/axios'
 import { useAuthStore } from '@/store'
 import { extractError } from '@/utils/extractError'
 
+const LANGUAGE_OPTIONS = [
+  { value: 'fr', label: 'Français' },
+  { value: 'en', label: 'English' },
+  { value: 'ar', label: 'العربية' },
+]
+
 export function ProfilePage() {
   const { user, setUser } = useAuthStore()
   const queryClient = useQueryClient()
-  const [form, setForm] = useState({ first_name: '', last_name: '', company: '', sector: '' })
+  const [form, setForm] = useState({ first_name: '', last_name: '', company: '', sector: '', preferred_language: 'fr' })
   const [saved, setSaved] = useState(false)
   const avatarRef = useRef<HTMLInputElement>(null)
 
@@ -26,6 +32,7 @@ export function ProfilePage() {
         last_name: user.profile.last_name || '',
         company: user.profile.company || '',
         sector: user.profile.sector || '',
+        preferred_language: (user.profile as { preferred_language?: string }).preferred_language || 'fr',
       })
     }
   }, [user])
@@ -102,7 +109,6 @@ export function ProfilePage() {
       {/* Profile Info */}
       <div className="rounded-xl border bg-white p-8 shadow-sm space-y-6">
         <div className="flex items-center gap-4 pb-6 border-b">
-          {/* Avatar with upload button */}
           <div className="relative">
             {avatarUrl ? (
               <img src={avatarUrl} alt="Avatar"
@@ -163,6 +169,23 @@ export function ProfilePage() {
             <label className="block text-sm font-medium mb-1.5">Sector</label>
             <input value={form.sector} onChange={e => setForm({ ...form, sector: e.target.value })}
               className="w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium mb-1.5 flex items-center gap-1.5">
+              <Mail className="h-3.5 w-3.5" /> Email Language
+            </label>
+            <select
+              value={form.preferred_language}
+              onChange={e => setForm({ ...form, preferred_language: e.target.value })}
+              className="w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+            >
+              {LANGUAGE_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground mt-1.5">
+              Transactional emails (verification, password reset, application updates) will be sent in this language.
+            </p>
           </div>
         </div>
 

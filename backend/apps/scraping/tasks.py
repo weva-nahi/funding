@@ -9,8 +9,15 @@ from . import services
 from .models import ScrapingJob
 
 
-@shared_task(bind=True, time_limit=600, soft_time_limit=540, queue="scraping")
-def run_scraping_job(self, source: str, max_pages: int = 5, user_id: int = None):
+@shared_task(bind=True, time_limit=3600, soft_time_limit=3540, queue="scraping")
+def run_scraping_job(self, source: str, user_id: int = None):
+    """Run a single source to completion. No page cap — see BaseScraper.
+
+    time_limit raised to 1 hour (from the old 10 minutes) since scrapers no
+    longer stop at a fixed page count; they now run until the source itself
+    is exhausted, which can legitimately take longer for sources with many
+    pages of Mauritania results.
+    """
     job = ScrapingJob.objects.create(
         source=source, status="running", started_at=timezone.now(), triggered_by_id=user_id,
     )
@@ -35,7 +42,7 @@ def run_scraping_job(self, source: str, max_pages: int = 5, user_id: int = None)
             pass
 
     try:
-        projects = services.run_scraper(source=source, max_pages=max_pages, progress_callback=progress_callback)
+        projects = services.run_scraper(source=source, progress_callback=progress_callback)
         result = services.save_projects(projects=projects, job=job)
         job.status = "completed"
         job.projects_found = result["created"]
@@ -48,7 +55,7 @@ def run_scraping_job(self, source: str, max_pages: int = 5, user_id: int = None)
                     "scraping_progress",
                     {"type": "scraping_update", "data": {
                         "job_id": job.id, "source": source, "pages_scraped": job.pages_scraped,
-                        "total_pages": max_pages, "projects_found": result["created"], "status": "completed"}},
+                        "total_pages": job.pages_scraped, "projects_found": result["created"], "status": "completed"}},
                 )
             except Exception:  # noqa: BLE001
                 pass
@@ -71,3 +78,37 @@ def run_scraping_job(self, source: str, max_pages: int = 5, user_id: int = None)
         job.finished_at = timezone.now()
         job.save()
         raise
+
+
+@shared_task(bind=True, queue="scraping")
+def run_all_scraping_jobs(self, user_id: int = None):
+    """Trigger every configured source as a separate scraping job.
+
+    This is the backing task for the "scrape all sources at once" admin
+    feature — instead of the admin clicking 'Start' seven times, one click
+    fans out into one run_scraping_job task per source. Each source still
+    gets its own ScrapingJob row, progress updates, and notification, so
+    nothing about per-source visibility is lost; only the *trigger* is
+    batched.
+    """
+    job_ids = []
+    for source in services.ALL_SOURCES:
+        async_result = run_scraping_job.delay(source=source, user_id=user_id)
+        job_ids.append({"source": source, "task_id": async_result.id})
+
+    if user_id:
+        from apps.authentication.models import User
+        from apps.notifications.services import create_notification
+
+        try:
+            user = User.objects.get(id=user_id)
+            create_notification(
+                user=user,
+                message=f"Started scraping all {len(job_ids)} sources.",
+                notification_type="scraping_complete",
+                category="scraping",
+            )
+        except User.DoesNotExist:
+            pass
+
+    return {"triggered": job_ids}

@@ -10,7 +10,7 @@ class FundingOpportunitySerializer(serializers.ModelSerializer):
     class Meta:
         model = FundingOpportunity
         fields = [
-            "id", "title", "source", "description", "country", "amount", "currency",
+            "id", "title", "source", "description", "country", "city", "amount", "currency",
             "deadline", "eligibility_criteria", "required_documents", "funding_type",
             "sector", "completeness_score", "status", "url", "metadata", "is_expired",
             "is_saved", "created_at", "updated_at",
@@ -35,7 +35,7 @@ class FundingOpportunityListSerializer(serializers.ModelSerializer):
     class Meta:
         model = FundingOpportunity
         fields = [
-            "id", "title", "source", "country", "amount", "currency", "deadline",
+            "id", "title", "source", "country", "city", "amount", "currency", "deadline",
             "funding_type", "sector", "completeness_score", "status", "is_expired",
             "is_saved", "created_at",
         ]
@@ -55,7 +55,7 @@ class OpportunityCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = FundingOpportunity
         fields = [
-            "title", "source", "description", "country", "amount", "currency",
+            "title", "source", "description", "country", "city", "amount", "currency",
             "deadline", "eligibility_criteria", "required_documents", "funding_type",
             "sector", "url", "metadata", "status",
         ]
@@ -65,7 +65,7 @@ class OpportunityUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = FundingOpportunity
         fields = [
-            "title", "source", "description", "country", "amount", "currency",
+            "title", "source", "description", "country", "city", "amount", "currency",
             "deadline", "eligibility_criteria", "required_documents", "funding_type",
             "sector", "url", "metadata", "status",
         ]

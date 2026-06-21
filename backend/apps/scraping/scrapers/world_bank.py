@@ -1,10 +1,12 @@
 """World Bank scraper — uses the official Projects JSON API.
 
-The projects list page is JavaScript-rendered (that is why the original HTML
-scraper returned nothing). The public JSON API at
-search.worldbank.org/api/v3/projects accepts ``countrycode_exact=MR`` to
-return only Mauritania projects, which is lighter and more reliable than
-any HTML scrape would be.
+The projects list page is JavaScript-rendered (that is why an HTML scraper
+would return nothing). The public JSON API at search.worldbank.org/api/v3/projects
+accepts ``countrycode_exact=MR`` to return only Mauritania projects directly
+from the source — this is the most reliable Mauritania filter of any scraper
+here since it's enforced server-side rather than text-matched.
+
+Runs until the API reports no more rows (total reached) — no page cap.
 """
 
 import logging
@@ -23,11 +25,12 @@ class WorldBankScraper(BaseScraper):
         "https://projects.worldbank.org/en/projects-operations/project-detail/{pid}"
     )
     ROWS_PER_PAGE = 30
-    COUNTRY_CODE = "MR"  # Mauritania. Set to None to fetch all countries.
+    COUNTRY_CODE = "MR"  # Mauritania — hard-enforced server-side via API param.
 
-    def scrape(self, max_pages=5, progress_callback=None):
+    def scrape(self, progress_callback=None):
         projects = []
-        for page in range(max_pages):
+        page = 0
+        while page < self.safety_max_pages:
             offset = page * self.ROWS_PER_PAGE
             params = {
                 "format": "json",
@@ -37,9 +40,8 @@ class WorldBankScraper(BaseScraper):
                 ),
                 "rows": self.ROWS_PER_PAGE,
                 "os": offset,
+                "countrycode_exact": self.COUNTRY_CODE,
             }
-            if self.COUNTRY_CODE:
-                params["countrycode_exact"] = self.COUNTRY_CODE
 
             payload = self._get_with_retry(params)
             if payload is None:
@@ -61,8 +63,11 @@ class WorldBankScraper(BaseScraper):
                 ).strip()[:1500]
                 country = (item.get("countryshortname") or "Mauritania").strip()
 
-                # Map the closing date into the real `deadline` field so
-                # classify_priority() works (it reads opportunity.deadline).
+                # Defensive re-check even though the API param already
+                # restricts to MR — guards against any API quirks.
+                if not self.keep_if_mauritania(country, title):
+                    continue
+
                 closing_date = self.parse_date(item.get("closingdate"))
 
                 project = {
@@ -70,7 +75,8 @@ class WorldBankScraper(BaseScraper):
                     "url": url,
                     "source": "WORLD_BANK",
                     "description": description,
-                    "country": country,
+                    "country": "Mauritania",
+                    "city": self.extract_city(title, description),
                     "amount": amount,
                     "currency": "USD",
                     "deadline": closing_date,
@@ -88,24 +94,25 @@ class WorldBankScraper(BaseScraper):
                 project["completeness_score"] = self.calculate_completeness_score(
                     project
                 )
+
+                if not self.has_financed_amount_and_active_deadline(project):
+                    continue
+
                 projects.append(project)
 
             if progress_callback:
-                progress_callback(page + 1, max_pages, len(projects))
+                progress_callback(page + 1, None, len(projects))
 
             total = int(payload.get("total", 0) or 0)
             if offset + self.ROWS_PER_PAGE >= total:
                 break
             self.sleep()
+            page += 1
 
         return projects
 
     def _get_with_retry(self, params, attempts=3):
-        """GET the API with simple exponential backoff (2s, 4s, 8s).
-
-        The World Bank API returns intermittent 500s; retrying transparently
-        smooths those over instead of aborting the whole page.
-        """
+        """GET the API with simple exponential backoff (2s, 4s, 8s)."""
         import time
 
         delay = 2

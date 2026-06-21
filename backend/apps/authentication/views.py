@@ -18,22 +18,23 @@ from .serializers import (
     PasswordResetRequestSerializer,
     ProfileSerializer,
     RegisterSerializer,
+    ResendVerificationSerializer,
     TokenSerializer,
+    UnsubscribeSerializer,
     UserSerializer,
 )
 
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "signup"
 
     @extend_schema(request=RegisterSerializer, responses={201: UserSerializer}, tags=["Authentication"])
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        services.register_user(
-            email=serializer.validated_data["email"],
-            password=serializer.validated_data["password"],
-        )
+        services.register_user(**serializer.validated_data)
         return Response(
             {"success": True, "message": "Registration successful. Please verify your email."},
             status=status.HTTP_201_CREATED,
@@ -157,6 +158,55 @@ class VerifyEmailView(APIView):
         )
 
 
+class ResendVerificationEmailView(APIView):
+    """Re-send the verification email for an unverified account."""
+
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "signup"
+
+    @extend_schema(request=ResendVerificationSerializer, tags=["Authentication"])
+    def post(self, request):
+        serializer = ResendVerificationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        services.resend_verification_email(email=serializer.validated_data["email"])
+        return Response(
+            {
+                "success": True,
+                "message": "If an unverified account exists for this email, a new verification link has been sent.",
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class UnsubscribeView(APIView):
+    """GDPR-compliant one-click unsubscribe — no login required.
+
+    Accepts the token via POST body (frontend page reads the :token route
+    param and posts it here) rather than GET-with-side-effects, since GET
+    requests can be pre-fetched by email-client link scanners/proxies and
+    silently trigger the unsubscribe before the user even opens the email —
+    a known issue with GET-based unsubscribe links.
+    """
+
+    permission_classes = [AllowAny]
+
+    @extend_schema(request=UnsubscribeSerializer, tags=["Authentication"])
+    def post(self, request):
+        serializer = UnsubscribeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        success = services.unsubscribe_user(token=serializer.validated_data["token"])
+        if not success:
+            return Response(
+                {"success": False, "message": "This unsubscribe link is invalid or has expired."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(
+            {"success": True, "message": "You have been unsubscribed from emails."},
+            status=status.HTTP_200_OK,
+        )
+
+
 class PasswordResetRequestView(APIView):
     permission_classes = [AllowAny]
 
@@ -212,16 +262,18 @@ class ProfileView(APIView):
 
     @extend_schema(request=ProfileSerializer, responses={200: ProfileSerializer}, tags=["Authentication"])
     def patch(self, request):
-        # Route through the serializer so input is validated before it reaches
-        # the service. Supports multipart (avatar upload) and JSON.
         serializer = ProfileSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
 
         validated = dict(serializer.validated_data)
 
-        # Avatar is a file field and isn't part of update_profile's allowed
-        # scalar kwargs — handle it directly if present.
         avatar = request.FILES.get("avatar")
+        if avatar is not None:
+            from common.validators import validate_file_size, validate_file_type
+
+            validate_file_size(avatar)
+            validate_file_type(avatar)  # also runs validate_image_dimensions internally
+
         profile = services.update_profile(user=request.user, **validated)
         if avatar is not None:
             profile.avatar = avatar

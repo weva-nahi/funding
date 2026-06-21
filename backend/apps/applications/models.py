@@ -13,6 +13,7 @@ class Application(TimestampMixin):
         ("draft", "Draft"),
         ("pending", "Pending"),
         ("in_review", "In Review"),
+        ("shortlisted", "Shortlisted"),
         ("approved", "Approved"),
         ("rejected", "Rejected"),
         ("withdrawn", "Withdrawn"),
@@ -31,11 +32,6 @@ class Application(TimestampMixin):
     class Meta:
         db_table = "applications"
         ordering = ["-created_at"]
-        # NOTE: the old blanket unique_together (user, opportunity) was removed.
-        # It blocked re-application after withdrawal. A partial unique index
-        # (see migration 0004) now enforces "one active application per
-        # (user, opportunity)" while still allowing a withdrawn row to coexist
-        # with a fresh application.
         indexes = [
             models.Index(fields=["status", "-created_at"], name="app_status_created_idx"),
         ]

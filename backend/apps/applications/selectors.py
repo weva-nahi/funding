@@ -37,6 +37,18 @@ def get_pending_applications():
     )
 
 
+def get_shortlisted_applications(*, opportunity_id=None):
+    """Applications currently in the shortlist pool — the admin's working
+    set when comparing finalists before picking a winner."""
+    qs = (
+        Application.objects.filter(status="shortlisted")
+        .select_related("user", "opportunity", "user__profile")
+    )
+    if opportunity_id:
+        qs = qs.filter(opportunity_id=opportunity_id)
+    return qs.order_by("-updated_at")
+
+
 def get_application_timeline(*, application_id: int):
     return (
         ApplicationStatusHistory.objects.filter(application_id=application_id)

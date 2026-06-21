@@ -27,7 +27,7 @@ class EUGlobalGatewayScraper(BaseScraper):
         "funding-and-technical-assistance/funding-opportunities_en"
     )
 
-    def scrape(self, max_pages=5, progress_callback=None):
+    def scrape(self, progress_callback=None):
         try:
             resp = requests.get(self.BASE_URL, headers=self.headers, timeout=30)
             if resp.status_code == 404:
@@ -46,5 +46,5 @@ class EUGlobalGatewayScraper(BaseScraper):
             logger.error(f"EU scraper error: {e}")
 
         if progress_callback:
-            progress_callback(1, 1, 0)
+            progress_callback(1, None, 0)
         return []

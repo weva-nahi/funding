@@ -7,7 +7,7 @@ interface AuthState {
   isLoading: boolean
   setUser: (user: User | null) => void
   setLoading: (loading: boolean) => void
-  logout: () => void
+  logout: (broadcast?: boolean) => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -24,8 +24,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user, isAuthenticated: !!user, isLoading: false })
 
     if (user) {
-      import('@/lib/websocket').then(({ notificationWS }) => {
+      import('@/lib/websocket').then(({ notificationWS, sessionSync }) => {
         notificationWS.connect()
+        sessionSync.broadcastLogin()
       })
     } else {
       import('@/lib/websocket').then(({ notificationWS }) => {
@@ -36,11 +37,19 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   setLoading: (isLoading) => set({ isLoading }),
 
-  logout: () => {
+  // `broadcast` defaults to true: a normal user-initiated logout from THIS
+  // tab should tell every other open tab to log out too. When logout()
+  // is invoked BECAUSE this tab received a broadcast from another tab
+  // (see main.tsx's sessionSync.subscribe handler), broadcast=false is
+  // passed to avoid an infinite ping-pong of logout messages between tabs.
+  logout: (broadcast = true) => {
     sessionStorage.removeItem('has_session')
     set({ user: null, isAuthenticated: false, isLoading: false })
-    import('@/lib/websocket').then(({ notificationWS }) => {
+    import('@/lib/websocket').then(({ notificationWS, sessionSync }) => {
       notificationWS.disconnect()
+      if (broadcast) {
+        sessionSync.broadcastLogout()
+      }
     })
     import('@/lib/axios').then(({ setAccessToken }) => {
       setAccessToken(null)

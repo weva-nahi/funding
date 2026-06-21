@@ -8,8 +8,13 @@ from common.pagination import StandardPagination
 from common.permissions import IsAdmin
 
 from . import selectors, services
-from .serializers import ScrapingAlertSerializer, ScrapingJobSerializer, StartScrapingSerializer
-from .tasks import run_scraping_job
+from .serializers import (
+    ScrapingAlertSerializer,
+    ScrapingJobSerializer,
+    StartAllScrapingSerializer,
+    StartScrapingSerializer,
+)
+from .tasks import run_all_scraping_jobs, run_scraping_job
 
 
 class StartScrapingView(APIView):
@@ -21,10 +26,27 @@ class StartScrapingView(APIView):
         serializer.is_valid(raise_exception=True)
         task = run_scraping_job.delay(
             source=serializer.validated_data["source"],
-            max_pages=serializer.validated_data["max_pages"],
             user_id=request.user.id,
         )
         return Response({"task_id": task.id, "message": "Scraping started."}, status=status.HTTP_202_ACCEPTED)
+
+
+class StartAllScrapingView(APIView):
+    """Admin clicks one button, every configured source starts scraping."""
+
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    @extend_schema(request=StartAllScrapingSerializer, tags=["Scraping"])
+    def post(self, request):
+        task = run_all_scraping_jobs.delay(user_id=request.user.id)
+        return Response(
+            {
+                "task_id": task.id,
+                "message": f"Scraping started for all {len(services.ALL_SOURCES)} sources.",
+                "sources": services.ALL_SOURCES,
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
 
 
 class CancelScrapingView(APIView):

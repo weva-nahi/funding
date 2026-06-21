@@ -28,7 +28,6 @@ class WebSocketManager {
     return `${protocol}//${host}${this.path}${token ? `?token=${token}` : ''}`
   }
 
-  /** Returns true if the socket is open or in the process of opening. */
   isConnected(): boolean {
     return (
       this.ws !== null &&
@@ -40,8 +39,6 @@ class WebSocketManager {
   connect(): void {
     const token = getAccessToken()
     if (!token) return
-
-    // Deduplicate — don't open a second connection.
     if (this.isConnected()) return
 
     this.shouldReconnect = true
@@ -110,3 +107,50 @@ class WebSocketManager {
 export const notificationWS = new WebSocketManager('/ws/notifications/')
 export const scrapingWS = new WebSocketManager('/ws/scraping/')
 export default WebSocketManager
+
+/**
+ * Cross-tab session sync — fixes "multiple tabs don't sync logout".
+ *
+ * BroadcastChannel lets any tab announce "I just logged out" and every
+ * other open tab of the same origin receives it instantly and forces its
+ * own logout, instead of staying silently authenticated until the user
+ * manually refreshes or hits a 401 on their next action.
+ *
+ * Falls back to a no-op shape in environments without BroadcastChannel
+ * support (very old browsers) — sessions in those tabs simply behave as
+ * they did before this fix (no cross-tab sync), rather than throwing.
+ */
+const CHANNEL_NAME = 'richat-session-sync'
+
+type SessionSyncMessage = { type: 'logout' } | { type: 'login' }
+
+class SessionSyncManager {
+  private channel: BroadcastChannel | null = null
+  private handlers: Set<(msg: SessionSyncMessage) => void> = new Set()
+
+  constructor() {
+    if (typeof BroadcastChannel !== 'undefined') {
+      this.channel = new BroadcastChannel(CHANNEL_NAME)
+      this.channel.onmessage = (event: MessageEvent<SessionSyncMessage>) => {
+        this.handlers.forEach((handler) => handler(event.data))
+      }
+    }
+  }
+
+  broadcastLogout(): void {
+    this.channel?.postMessage({ type: 'logout' } satisfies SessionSyncMessage)
+  }
+
+  broadcastLogin(): void {
+    this.channel?.postMessage({ type: 'login' } satisfies SessionSyncMessage)
+  }
+
+  subscribe(handler: (msg: SessionSyncMessage) => void): () => void {
+    this.handlers.add(handler)
+    return () => {
+      this.handlers.delete(handler)
+    }
+  }
+}
+
+export const sessionSync = new SessionSyncManager()

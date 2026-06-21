@@ -2,8 +2,11 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/axios'
 import { formatDate } from '@/utils/formatDate'
+import { CharCounter } from '@/components/CharCounter'
 import { MessageSquare, Send, CheckCircle, Clock, XCircle } from 'lucide-react'
 import type { ConsultingRequest, Paginated } from '@/types'
+
+const DESCRIPTION_MAX = 2000
 
 export function ConsultingPage() {
   const queryClient = useQueryClient()
@@ -49,9 +52,12 @@ export function ConsultingPage() {
       {showForm && (
         <div className="rounded-xl border bg-white p-6 shadow-sm space-y-4">
           <h3 className="font-semibold">Submit a Consulting Request</h3>
-          <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={4}
+          <textarea value={desc} onChange={e => setDesc(e.target.value.slice(0, DESCRIPTION_MAX))} rows={4}
             placeholder="Describe what you need help with..."
             className="w-full rounded-lg border p-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none" />
+          <div className="flex justify-end -mt-2">
+            <CharCounter current={desc.length} max={DESCRIPTION_MAX} />
+          </div>
           <div className="flex items-center gap-3">
             <select value={priority} onChange={e => setPriority(e.target.value)}
               className="rounded-lg border px-3 py-2 text-sm bg-white">

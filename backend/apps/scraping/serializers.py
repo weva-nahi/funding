@@ -34,4 +34,14 @@ class ScrapingAlertSerializer(serializers.ModelSerializer):
 
 class StartScrapingSerializer(serializers.Serializer):
     source = serializers.ChoiceField(choices=["gef", "gcf", "oecd", "climate_fund", "world_bank", "afd", "eu"])
-    max_pages = serializers.IntegerField(default=5, min_value=1, max_value=20)
+    # max_pages removed — scrapers now always run to completion (see
+    # apps.scraping.scrapers.base.BaseScraper.safety_max_pages for the
+    # runaway-loop safety net, which is not a tunable product setting).
+
+
+class StartAllScrapingSerializer(serializers.Serializer):
+    """Empty body serializer for the 'scrape all sources' endpoint — kept
+    as a real serializer (rather than skipping validation) so drf-spectacular
+    documents the endpoint correctly and so it's trivial to add fields
+    (e.g. an exclude-sources list) later without changing the view."""
+    pass

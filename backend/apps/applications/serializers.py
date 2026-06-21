@@ -65,6 +65,10 @@ class ApplicationUpdateSerializer(serializers.Serializer):
 
 
 class ApplicationReviewSerializer(serializers.Serializer):
-    action = serializers.ChoiceField(choices=["approve", "reject", "in_review"])
+    action = serializers.ChoiceField(choices=["approve", "reject", "in_review", "shortlist"])
     comment = serializers.CharField(required=False, allow_blank=True, default="")
     reason = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class BulkShortlistSerializer(serializers.Serializer):
+    ids = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)

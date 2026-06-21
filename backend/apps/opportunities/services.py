@@ -6,7 +6,7 @@ import logging
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from common.exceptions import ConflictError, InvalidFileError
+from common.exceptions import ApplicationError, ConflictError, InvalidFileError
 from common.utils.hashing import generate_opportunity_hash
 
 from .models import FundingOpportunity, SavedOpportunity
@@ -25,10 +25,8 @@ COMPLETENESS_FIELDS = [
     "url",
 ]
 
-# Valid source choices matching the model
 VALID_SOURCES = {"GEF", "GCF", "OECD", "CLIMATE_FUND", "WORLD_BANK", "AFD", "EU"}
 
-# Common aliases people type in Excel that should map to valid choices
 SOURCE_ALIASES = {
     "WORLD BANK": "WORLD_BANK",
     "WORLD-BANK": "WORLD_BANK",
@@ -39,6 +37,13 @@ SOURCE_ALIASES = {
     "AGENCE FRANCAISE DE DEVELOPPEMENT": "AFD",
     "EUROPEAN UNION": "EU",
 }
+
+# Fields locked once an opportunity is published — changing the headline
+# financial terms (amount) or the application deadline after applicants
+# have already seen and applied under those terms would be unfair to them
+# and undermines the platform's transparency. This is the server-side
+# enforcement matching the disabled inputs added in the admin form (Batch 5).
+LOCKED_FIELDS_AFTER_PUBLISH = {"amount", "deadline"}
 
 
 def _normalize_source(raw: str) -> str:
@@ -82,8 +87,33 @@ def create_opportunity(*, created_by=None, **kwargs) -> FundingOpportunity:
 
 
 def update_opportunity(
-    *, opportunity: FundingOpportunity, **kwargs
+    *, opportunity: FundingOpportunity, editor=None, **kwargs
 ) -> FundingOpportunity:
+    """Update an opportunity's fields.
+
+    Once an opportunity is published, `amount` and `deadline` cannot be
+    changed (see LOCKED_FIELDS_AFTER_PUBLISH) — for transparency, since
+    applicants already saw and applied under the original terms. The check
+    compares the incoming value against the CURRENT value rather than
+    blanket-rejecting the key's presence in kwargs, so a PATCH that
+    resends the unchanged amount (e.g. a full-form re-submit from the
+    frontend) doesn't spuriously fail.
+    """
+    if opportunity.status == "published":
+        for field in LOCKED_FIELDS_AFTER_PUBLISH:
+            if field in kwargs:
+                incoming = kwargs[field]
+                current = getattr(opportunity, field)
+                # Normalize for comparison: Decimal vs float/str mismatches
+                # and date vs string mismatches are common when this value
+                # round-trips through JSON, so compare as strings when both
+                # sides are present, but allow None-vs-None / unset to pass.
+                if str(incoming) != str(current) and not (incoming is None and current is None):
+                    raise ApplicationError(
+                        f"'{field}' cannot be changed after an opportunity is published. "
+                        f"Archive and re-create the listing if this figure must change."
+                    )
+
     for field, value in kwargs.items():
         if hasattr(opportunity, field):
             setattr(opportunity, field, value)
@@ -158,6 +188,7 @@ def import_opportunities_from_xlsx(*, file_obj, created_by=None) -> dict:
         "source": "source",
         "description": "description",
         "country": "country",
+        "city": "city",
         "amount": "amount",
         "currency": "currency",
         "deadline": "deadline",

@@ -29,6 +29,8 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
+  const [showResendLink, setShowResendLink] = useState(false)
+  const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent'>('idle')
   const [loading, setLoading] = useState(false)
   const { setUser } = useAuthStore()
   const { setUnreadCount } = useNotificationStore()
@@ -43,18 +45,17 @@ export function LoginPage() {
     setEmail(account.email)
     setPassword(account.password)
     setError('')
+    setShowResendLink(false)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setShowResendLink(false)
     setLoading(true)
     try {
       const { data } = await api.post('/auth/login/', { email, password })
 
-      // CRITICAL: clear ALL cached queries from any previous user session
-      // before setting the new user. This prevents admin seeing client data
-      // and vice versa.
       queryClient.clear()
 
       setAccessToken(data.access)
@@ -69,8 +70,6 @@ export function LoginPage() {
 
       const targetRole = data.user.role
 
-      // If there's a saved location and it belongs to the correct role, use it.
-      // Otherwise always send to the role's home page.
       if (from && from !== '/login') {
         const isAdminPath = from.startsWith('/admin')
         if (targetRole === 'admin' && isAdminPath) {
@@ -91,12 +90,28 @@ export function LoginPage() {
       const ax = err as {
         response?: { data?: { error?: { message?: string } } }
       }
-      setError(
-        ax.response?.data?.error?.message ||
-          'Login failed. Please check your credentials.'
-      )
+      const msg = ax.response?.data?.error?.message || 'Login failed. Please check your credentials.'
+      setError(msg)
+      // Surface the resend-verification shortcut specifically when the
+      // backend's "not verified" message comes through, so users aren't
+      // stuck having to navigate to a separate page to find it.
+      if (msg.toLowerCase().includes('verify your email') || msg.toLowerCase().includes('not verified')) {
+        setShowResendLink(true)
+      }
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleResend = async () => {
+    if (!email) return
+    setResendStatus('sending')
+    try {
+      await api.post('/auth/resend-verification/', { email })
+    } catch {
+      // Endpoint is intentionally always success-shaped
+    } finally {
+      setResendStatus('sent')
     }
   }
 
@@ -161,8 +176,26 @@ export function LoginPage() {
           )}
 
           {error && (
-            <div className="rounded-lg bg-red-50 border border-red-200 p-4 text-sm text-red-700">
-              {error}
+            <div className="rounded-lg bg-red-50 border border-red-200 p-4 text-sm text-red-700 space-y-2">
+              <p>{error}</p>
+              {showResendLink && (
+                <div className="pt-2 border-t border-red-200">
+                  {resendStatus === 'sent' ? (
+                    <p className="text-xs text-red-600">
+                      If an unverified account exists for this email, a new verification link has been sent.
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResend}
+                      disabled={resendStatus === 'sending'}
+                      className="text-xs font-semibold text-red-700 underline hover:text-red-800 disabled:opacity-50"
+                    >
+                      {resendStatus === 'sending' ? 'Sending…' : 'Resend verification email'}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

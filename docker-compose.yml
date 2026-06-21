@@ -24,6 +24,18 @@ services:
     image: redis:7-alpine
     container_name: richat_redis
     restart: unless-stopped
+    # ── Redis usage map (see backend/config/settings/base.py for the full
+    # rationale comment) ─────────────────────────────────────────────────
+    # This single Redis instance is logically partitioned by DB index:
+    #   DB 1 -> Celery broker
+    #   DB 2 -> Celery result backend
+    #   DB 3 -> Django Channels layer (WebSockets)
+    #   DB 4 -> Django cache / token cache
+    # If this becomes a single point of failure in production (Celery
+    # broker outage taking down the cache too, or vice versa), split DB 1/2
+    # onto a separate Redis instance from DB 3/4 by changing the four
+    # *_URL env vars in .env — no code changes required, since every
+    # consumer already reads its own independent URL setting.
     command: >
       redis-server
       --appendonly yes
@@ -109,7 +121,10 @@ services:
   celery_scraping_worker:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      # Dedicated image with Chromium/chromedriver — the OECD Selenium
+      # scraper is the only thing that needs them, so they're isolated to
+      # this one service instead of bloating backend/celery_worker/celery_beat.
+      dockerfile: Dockerfile.scraping
     container_name: richat_celery_scraping
     restart: unless-stopped
     command: celery -A config worker -l info --concurrency=2 -Q scraping
@@ -127,6 +142,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping --destination celery@$$HOSTNAME --timeout 5 2>/dev/null | grep -q pong || exit 1"]
+      interval: 60s
+      timeout: 15s
+      retries: 5
+      start_period: 90s
 
   celery_beat:
     build:

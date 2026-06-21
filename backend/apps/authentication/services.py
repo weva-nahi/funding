@@ -11,6 +11,7 @@ from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from common.exceptions import AccountLockedError, ApplicationError
+from common.utils.email_i18n import resolve_unsubscribe_token
 
 from .models import EmailVerificationToken, PasswordResetToken, Profile, User
 from .tasks import send_reset_password_email, send_verification_email
@@ -22,6 +23,10 @@ def register_user(*, email: str, password: str, role: str = "client", **kwargs) 
     if User.objects.filter(email__iexact=email).exists():
         raise ApplicationError("An account with this email already exists.")
 
+    language = kwargs.get("language") or kwargs.get("preferred_language") or "fr"
+    if language not in ("fr", "en", "ar"):
+        language = "fr"
+
     with transaction.atomic():
         user = User.objects.create_user(email=email, password=password, role=role)
         Profile.objects.create(
@@ -29,6 +34,9 @@ def register_user(*, email: str, password: str, role: str = "client", **kwargs) 
             first_name=kwargs.get("first_name", ""),
             last_name=kwargs.get("last_name", ""),
             company=kwargs.get("company_name", ""),
+            phone=kwargs.get("phone", ""),
+            sector=kwargs.get("sector", ""),
+            preferred_language=language,
         )
 
     org_name = kwargs.get("company_name") or kwargs.get("organization_name")
@@ -40,7 +48,7 @@ def register_user(*, email: str, password: str, role: str = "client", **kwargs) 
                 name=org_name,
                 registration_number=kwargs.get("registration_number") or None,
                 industry=kwargs.get("industry", ""),
-                size=kwargs.get("size", ""),
+                size=kwargs.get("company_size") or kwargs.get("size", ""),
                 location=kwargs.get("location", ""),
             )
         except Exception as exc:
@@ -60,9 +68,58 @@ def register_user(*, email: str, password: str, role: str = "client", **kwargs) 
     return user
 
 
+def resend_verification_email(*, email: str) -> None:
+    """Re-issue a verification email. Silently no-ops on unknown/verified
+    accounts to avoid leaking whether an email is registered."""
+    try:
+        user = User.objects.get(email__iexact=email, is_active=True)
+    except User.DoesNotExist:
+        return
+
+    if user.is_email_verified:
+        return
+
+    EmailVerificationToken.objects.filter(user=user, used=False).update(used=True)
+
+    token = _generate_verification_token(user)
+    verify_url = f"{settings.FRONTEND_URL}/verify-email/{token}"
+
+    logger.warning(
+        "\n" + "=" * 60 + "\n"
+        "RESENT EMAIL VERIFICATION LINK FOR: %s\n%s\n" + "=" * 60,
+        email,
+        verify_url,
+    )
+
+    send_verification_email.delay(user.id, token)
+
+
+def unsubscribe_user(*, token: str) -> bool:
+    """Flip notify_email_enabled off for the user encoded in the token.
+
+    Returns True if a matching, still-existing user was found and updated,
+    False if the token was invalid (already-expired/malformed) or the
+    account no longer exists — callers should show a generic "link invalid"
+    message in the False case rather than anything more specific, to avoid
+    leaking account-existence information.
+    """
+    user_id = resolve_unsubscribe_token(token)
+    if user_id is None:
+        return False
+
+    try:
+        profile = Profile.objects.get(user_id=user_id)
+    except Profile.DoesNotExist:
+        return False
+
+    if profile.notify_email_enabled:
+        profile.notify_email_enabled = False
+        profile.save(update_fields=["notify_email_enabled"])
+    return True
+
+
 def verify_email(*, token: str) -> User:
     """Verify email using DB token (Redis as cache, DB as fallback)."""
-    # Try Redis first (fast path)
     user_id = cache.get(f"email_verify:{token}")
 
     if user_id:
@@ -70,11 +127,9 @@ def verify_email(*, token: str) -> User:
         user.is_email_verified = True
         user.save(update_fields=["is_email_verified"])
         cache.delete(f"email_verify:{token}")
-        # Mark DB token as used
         EmailVerificationToken.objects.filter(token=token).update(used=True)
         return user
 
-    # Fallback: check DB token (handles Redis restart scenario)
     try:
         db_token = EmailVerificationToken.objects.select_related("user").get(token=token)
     except EmailVerificationToken.DoesNotExist:
@@ -155,7 +210,6 @@ def request_password_reset(*, email: str) -> None:
 
 
 def reset_password(*, token: str, new_password: str) -> None:
-    # Try Redis first
     user_id = cache.get(f"password_reset:{token}")
 
     if user_id:
@@ -166,7 +220,6 @@ def reset_password(*, token: str, new_password: str) -> None:
         PasswordResetToken.objects.filter(token=token).update(used=True)
         return
 
-    # Fallback: DB token
     try:
         db_token = PasswordResetToken.objects.select_related("user").get(token=token)
     except PasswordResetToken.DoesNotExist:
@@ -197,6 +250,7 @@ def update_profile(*, user: User, **kwargs) -> Profile:
         "company",
         "phone",
         "sector",
+        "preferred_language",
         "notify_application_status",
         "notify_new_opportunities",
         "notify_consulting_response",
@@ -225,10 +279,8 @@ def _generate_verification_token(user: User) -> str:
     token = uuid.uuid4().hex
     expires_at = timezone.now() + timedelta(hours=24)
 
-    # Store in Redis (fast lookup)
     cache.set(f"email_verify:{token}", user.id, timeout=86400)
 
-    # Store in DB (survives Redis restart)
     EmailVerificationToken.objects.create(
         user=user,
         token=token,
@@ -243,10 +295,8 @@ def _generate_reset_token(user: User) -> str:
     expiry_seconds = settings.SIGNED_URL_EXPIRY_SECONDS
     expires_at = timezone.now() + timedelta(seconds=expiry_seconds)
 
-    # Store in Redis
     cache.set(f"password_reset:{token}", user.id, timeout=expiry_seconds)
 
-    # Store in DB (survives Redis restart)
     PasswordResetToken.objects.create(
         user=user,
         token=token,

@@ -13,6 +13,7 @@ import { RegisterPage } from '@/pages/auth/RegisterPage'
 import { VerifyEmailPage } from '@/pages/auth/VerifyEmailPage'
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
 import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
+import { UnsubscribePage } from '@/pages/auth/UnsubscribePage'
 
 import { DashboardPage } from '@/pages/client/DashboardPage'
 import { OpportunitiesPage } from '@/pages/client/OpportunitiesPage'
@@ -21,6 +22,7 @@ import { NewApplicationPage } from '@/pages/client/NewApplicationPage'
 import { MyApplicationsPage } from '@/pages/client/MyApplicationsPage'
 import { ApplicationDetailPage } from '@/pages/client/ApplicationDetailPage'
 import { NotificationsPage } from '@/pages/client/NotificationsPage'
+import { NotificationSettingsPage } from '@/pages/client/NotificationSettingsPage'
 import { ConsultingPage } from '@/pages/client/ConsultingPage'
 import { ProfilePage } from '@/pages/client/ProfilePage'
 
@@ -49,6 +51,7 @@ export function AppRouter() {
       <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+      <Route path="/unsubscribe/:token" element={<UnsubscribePage />} />
 
       <Route element={<ProtectedRoute><ClientLayout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<DashboardPage />} />
@@ -60,6 +63,7 @@ export function AppRouter() {
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/consulting" element={<ConsultingPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/profile/notifications" element={<NotificationSettingsPage />} />
       </Route>
 
       <Route element={<ProtectedRoute><AdminRoute><AdminLayout /></AdminRoute></ProtectedRoute>}>

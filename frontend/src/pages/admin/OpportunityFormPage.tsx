@@ -2,14 +2,16 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/axios'
-import { SOURCES, FUNDING_TYPES } from '@/lib/constants'
-import { ArrowLeft, Save, Globe, AlertCircle } from 'lucide-react'
+import { SOURCES, FUNDING_TYPES, MAURITANIA_CITIES, SECTORS } from '@/lib/constants'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { ArrowLeft, Save, Globe, AlertCircle, Archive } from 'lucide-react'
 
 interface FormState {
   title: string
   source: string
   description: string
   country: string
+  city: string
   amount: string
   currency: string
   deadline: string
@@ -22,7 +24,7 @@ interface FormState {
 }
 
 const DEFAULT_FORM: FormState = {
-  title: '', source: 'GEF', description: '', country: '', amount: '', currency: 'USD',
+  title: '', source: 'GEF', description: '', country: 'Mauritania', city: '', amount: '', currency: 'USD',
   deadline: '', eligibility_criteria: '', required_documents: '', funding_type: 'grant',
   sector: '', url: '', status: 'draft',
 }
@@ -39,8 +41,10 @@ export function OpportunityFormPage() {
   const queryClient = useQueryClient()
   const [form, setForm] = useState<FormState>(DEFAULT_FORM)
   const [error, setError] = useState('')
+  const [confirmPublish, setConfirmPublish] = useState(false)
+  const [confirmArchive, setConfirmArchive] = useState(false)
 
-  useQuery({
+  const { data: existing } = useQuery({
     queryKey: ['admin-opportunity', id],
     queryFn: () => api.get(`/opportunities/admin/${id}/`).then(r => {
       const d = r.data
@@ -48,7 +52,8 @@ export function OpportunityFormPage() {
         title: d.title || '',
         source: d.source || 'GEF',
         description: d.description || '',
-        country: d.country || '',
+        country: d.country || 'Mauritania',
+        city: d.city || '',
         amount: d.amount != null ? String(d.amount) : '',
         currency: d.currency || 'USD',
         deadline: d.deadline || '',
@@ -63,6 +68,8 @@ export function OpportunityFormPage() {
     }),
     enabled: isEdit,
   })
+
+  const isPublished = isEdit && existing?.status === 'published'
 
   const saveMutation = useMutation({
     mutationFn: () => {
@@ -88,6 +95,19 @@ export function OpportunityFormPage() {
     },
     onError: (err: unknown) => {
       setError(extractError(err, 'Failed to publish the opportunity. Please try again.'))
+      setConfirmPublish(false)
+    },
+  })
+
+  const archiveMutation = useMutation({
+    mutationFn: () => api.post(`/opportunities/admin/${id}/archive/`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-opportunities'] })
+      navigate('/admin/opportunities')
+    },
+    onError: (err: unknown) => {
+      setError(extractError(err, 'Failed to archive the opportunity. Please try again.'))
+      setConfirmArchive(false)
     },
   })
 
@@ -98,20 +118,36 @@ export function OpportunityFormPage() {
     <div className="max-w-4xl space-y-6 animate-fade-in pb-12">
       <div className="flex items-center justify-between">
         <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Back
+          <ArrowLeft className="h-4 w-4 rtl:rotate-180" /> Back
         </button>
-        {isEdit && form.status === 'draft' && (
-          <button onClick={() => { setError(''); publishMutation.mutate() }} disabled={publishMutation.isPending}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2">
-            <Globe className="h-4 w-4" /> Publish Now
-          </button>
-        )}
+        <div className="flex gap-2">
+          {isPublished && (
+            <button onClick={() => setConfirmArchive(true)} disabled={archiveMutation.isPending}
+              className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-50 flex items-center gap-2">
+              <Archive className="h-4 w-4" /> Archive
+            </button>
+          )}
+          {isEdit && form.status === 'draft' && (
+            <button onClick={() => setConfirmPublish(true)} disabled={publishMutation.isPending}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2">
+              <Globe className="h-4 w-4" /> Publish Now
+            </button>
+          )}
+        </div>
       </div>
 
       <div>
         <h1 className="text-2xl font-bold tracking-tight">{isEdit ? 'Edit Opportunity' : 'New Opportunity'}</h1>
         <p className="text-muted-foreground mt-1">Fill in the details below</p>
       </div>
+
+      {isPublished && (
+        <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          This opportunity is published. Amount and deadline are locked for transparency — applicants have already
+          seen these terms. Archive and re-create the listing if these figures genuinely need to change.
+        </div>
+      )}
 
       {error && (
         <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 p-4 text-sm text-red-700">
@@ -135,24 +171,30 @@ export function OpportunityFormPage() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1.5">Sector</label>
-            <input value={form.sector} onChange={set('sector')}
-              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="e.g. Energy, Agriculture" />
+            <select value={form.sector} onChange={set('sector')}
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white">
+              <option value="">Select a sector</option>
+              {SECTORS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1.5">Amount</label>
+            <label className="block text-sm font-medium mb-1.5">
+              Amount {isPublished && <span className="text-xs text-amber-600 font-normal">(locked — published)</span>}
+            </label>
             <div className="flex gap-2">
-              <input type="number" value={form.amount} onChange={set('amount')}
-                className="flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              <input type="number" step={1000} value={form.amount} onChange={set('amount')} disabled={isPublished}
+                className="flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted disabled:cursor-not-allowed"
                 placeholder="1000000" />
-              <input value={form.currency} onChange={set('currency')}
-                className="w-20 rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-center" />
+              <input value={form.currency} onChange={set('currency')} disabled={isPublished}
+                className="w-20 rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-center disabled:bg-muted disabled:cursor-not-allowed" />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1.5">Deadline</label>
-            <input type="date" value={form.deadline} onChange={set('deadline')}
-              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+            <label className="block text-sm font-medium mb-1.5">
+              Deadline {isPublished && <span className="text-xs text-amber-600 font-normal">(locked — published)</span>}
+            </label>
+            <input type="date" value={form.deadline} onChange={set('deadline')} disabled={isPublished}
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-muted disabled:cursor-not-allowed" />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1.5">Funding Type</label>
@@ -162,9 +204,12 @@ export function OpportunityFormPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1.5">Target Country / Region</label>
-            <input value={form.country} onChange={set('country')}
-              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+            <label className="block text-sm font-medium mb-1.5">City / Region</label>
+            <select value={form.city} onChange={set('city')}
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white">
+              <option value="">Not specified (national)</option>
+              {MAURITANIA_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
           </div>
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium mb-1.5">Original URL</label>
@@ -189,8 +234,8 @@ export function OpportunityFormPage() {
           </div>
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium mb-1.5">Status</label>
-            <select value={form.status} onChange={set('status')}
-              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white">
+            <select value={form.status} onChange={set('status')} disabled={isPublished}
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white disabled:bg-muted">
               <option value="draft">Draft</option>
               <option value="published">Published</option>
               <option value="archived">Archived</option>
@@ -205,6 +250,27 @@ export function OpportunityFormPage() {
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmPublish}
+        title="Publish this opportunity?"
+        message="It will become visible to all clients immediately, and its amount/deadline will be locked from further edits to maintain transparency for applicants."
+        confirmLabel="Publish"
+        isLoading={publishMutation.isPending}
+        onConfirm={() => publishMutation.mutate()}
+        onCancel={() => setConfirmPublish(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmArchive}
+        title="Archive this opportunity?"
+        message="It will be hidden from all clients and removed from search results. This does not delete existing applications submitted against it."
+        variant="warning"
+        confirmLabel="Archive"
+        isLoading={archiveMutation.isPending}
+        onConfirm={() => archiveMutation.mutate()}
+        onCancel={() => setConfirmArchive(false)}
+      />
     </div>
   )
 }

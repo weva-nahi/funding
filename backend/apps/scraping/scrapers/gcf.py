@@ -5,6 +5,10 @@ The projects list is server-rendered (Drupal). Each project is a
 full (untruncated) title is in the ``title`` attribute of the
 ``.card-project__title`` paragraph (the visible text is CSS-clamped).
 Pagination is ``?page=N`` (0-indexed; page 0 = base URL).
+
+GCF has no Mauritania-only facet on this listing page, so every project's
+country list is checked against is_mauritania_project() and non-Mauritania
+projects are skipped. Runs until the source returns an empty page.
 """
 
 import logging
@@ -21,9 +25,10 @@ class GCFScraper(BaseScraper):
     SOURCE_NAME = "GCF"
     BASE_URL = "https://www.greenclimate.fund/projects"
 
-    def scrape(self, max_pages=5, progress_callback=None):
+    def scrape(self, progress_callback=None):
         projects = []
-        for page in range(max_pages):
+        page = 0
+        while page < self.safety_max_pages:
             url = self.BASE_URL if page == 0 else f"{self.BASE_URL}?page={page}"
             try:
                 resp = requests.get(url, headers=self.headers, timeout=30)
@@ -41,7 +46,6 @@ class GCFScraper(BaseScraper):
                     title_el = card.select_one(".card-project__title p")
                     title = ""
                     if title_el:
-                        # Full title is in the `title` attribute; visible text is clamped.
                         title = (
                             title_el.get("title") or title_el.get_text(strip=True)
                         ).strip()
@@ -62,6 +66,11 @@ class GCFScraper(BaseScraper):
                         country_el.get_text(" ", strip=True) if country_el else ""
                     )
 
+                    # Mauritania-only filter — GCF lists projects from every
+                    # country on this page, no facet to pre-filter with.
+                    if not self.keep_if_mauritania(country, title):
+                        continue
+
                     theme_el = card.select_one(".card-project__target .badge")
                     theme = theme_el.get_text(strip=True) if theme_el else ""
 
@@ -72,9 +81,10 @@ class GCFScraper(BaseScraper):
                         "description": " — ".join(
                             [p for p in (code, theme) if p]
                         ),
-                        "country": country,
+                        "country": "Mauritania",
+                        "city": self.extract_city(title, theme),
                         "currency": "USD",
-                        "metadata": {"code": code, "theme": theme},
+                        "metadata": {"code": code, "theme": theme, "raw_country": country},
                     }
                     project["sector"] = self.classify_sector(f"{title} {theme}")
                     project["funding_type"] = self.classify_funding_type(
@@ -84,11 +94,16 @@ class GCFScraper(BaseScraper):
                     project["completeness_score"] = self.calculate_completeness_score(
                         project
                     )
+
+                    if not self.has_financed_amount_and_active_deadline(project):
+                        continue
+
                     projects.append(project)
 
                 if progress_callback:
-                    progress_callback(page + 1, max_pages, len(projects))
+                    progress_callback(page + 1, None, len(projects))
                 self.sleep()
+                page += 1
 
             except Exception as e:  # noqa: BLE001
                 logger.error(f"GCF scraping error page {page}: {e}")

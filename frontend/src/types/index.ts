@@ -1,4 +1,4 @@
-export type ApplicationStatus = 'draft' | 'pending' | 'in_review' | 'approved' | 'rejected' | 'withdrawn'
+export type ApplicationStatus = 'draft' | 'pending' | 'in_review' | 'shortlisted' | 'approved' | 'rejected' | 'withdrawn'
 export type OpportunityStatus = 'draft' | 'published' | 'archived'
 
 export interface Paginated<T> {
@@ -14,6 +14,7 @@ export interface Profile {
   company: string
   avatar: string | null
   sector: string
+  preferred_language?: 'fr' | 'en' | 'ar'
 }
 
 export interface User {
@@ -33,6 +34,7 @@ export interface Opportunity {
   source: string
   description?: string
   country?: string
+  city?: string
   amount?: number | null
   currency: string
   deadline?: string | null
@@ -115,7 +117,10 @@ export interface AuditLog {
   action: string
   model_name: string
   record_id: number | null
+  data_before?: Record<string, unknown>
+  data_after?: Record<string, unknown>
   ip_address: string | null
+  user_agent?: string
   timestamp: string
 }
 

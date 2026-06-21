@@ -15,6 +15,39 @@ export function AdminDashboardPage() {
     queryFn: () => api.get('/applications/admin/?status=pending&page_size=5').then(r => r.data),
   })
 
+  // Each card now links to the filtered list view that actually contains
+  // the records behind the number — fixes "dashboard stats are not clickable".
+  const statCards = [
+    {
+      label: 'Active Clients',
+      value: stats?.active_clients ?? 0,
+      icon: Users,
+      color: 'bg-blue-100 text-blue-600',
+      to: '/admin/users',
+    },
+    {
+      label: 'Pending Applications',
+      value: stats?.pending_applications ?? 0,
+      icon: FileText,
+      color: 'bg-amber-100 text-amber-600',
+      to: '/admin/applications?status=pending',
+    },
+    {
+      label: 'Approved This Month',
+      value: stats?.approved_this_month ?? 0,
+      icon: CheckCircle,
+      color: 'bg-emerald-100 text-emerald-600',
+      to: '/admin/applications?status=approved',
+    },
+    {
+      label: 'Total Applications',
+      value: stats?.total_applications ?? 0,
+      icon: Globe,
+      color: 'bg-purple-100 text-purple-600',
+      to: '/admin/applications',
+    },
+  ]
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -33,42 +66,22 @@ export function AdminDashboardPage() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-4">
-              <div className="rounded-lg p-3 bg-blue-100 text-blue-600"><Users className="h-5 w-5" /></div>
-              <div>
-                <p className="text-2xl font-bold">{stats?.active_clients ?? 0}</p>
-                <p className="text-xs text-muted-foreground">Active Clients</p>
+          {statCards.map(({ label, value, icon: Icon, color, to }) => (
+            <Link
+              key={label}
+              to={to}
+              className="rounded-xl border bg-white p-6 shadow-sm hover:shadow-md hover:border-primary/30 transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <div className={`rounded-lg p-3 ${color}`}><Icon className="h-5 w-5" /></div>
+                <div className="flex-1">
+                  <p className="text-2xl font-bold">{value}</p>
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity rtl:rotate-180" />
               </div>
-            </div>
-          </div>
-          <div className="rounded-xl border bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-4">
-              <div className="rounded-lg p-3 bg-amber-100 text-amber-600"><FileText className="h-5 w-5" /></div>
-              <div>
-                <p className="text-2xl font-bold">{stats?.pending_applications ?? 0}</p>
-                <p className="text-xs text-muted-foreground">Pending Applications</p>
-              </div>
-            </div>
-          </div>
-          <div className="rounded-xl border bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-4">
-              <div className="rounded-lg p-3 bg-emerald-100 text-emerald-600"><CheckCircle className="h-5 w-5" /></div>
-              <div>
-                <p className="text-2xl font-bold">{stats?.approved_this_month ?? 0}</p>
-                <p className="text-xs text-muted-foreground">Approved This Month</p>
-              </div>
-            </div>
-          </div>
-          <div className="rounded-xl border bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-4">
-              <div className="rounded-lg p-3 bg-purple-100 text-purple-600"><Globe className="h-5 w-5" /></div>
-              <div>
-                <p className="text-2xl font-bold">{stats?.total_applications ?? 0}</p>
-                <p className="text-xs text-muted-foreground">Total Applications</p>
-              </div>
-            </div>
-          </div>
+            </Link>
+          ))}
         </div>
       )}
 
@@ -76,7 +89,7 @@ export function AdminDashboardPage() {
         <div className="rounded-xl border bg-white shadow-sm flex flex-col">
           <div className="flex items-center justify-between border-b p-6">
             <h2 className="text-lg font-semibold">Pending Applications</h2>
-            <Link to="/admin/applications" className="text-sm text-primary hover:underline">View all</Link>
+            <Link to="/admin/applications?status=pending" className="text-sm text-primary hover:underline">View all</Link>
           </div>
           <div className="p-6 flex-1">
             {appsLoading ? (
@@ -91,8 +104,8 @@ export function AdminDashboardPage() {
                       <p className="font-medium text-sm">{app.opportunity_title}</p>
                       <p className="text-xs text-muted-foreground">{app.user_email}</p>
                     </div>
-                    <Link to="/admin/applications" className="rounded-full bg-primary/10 p-2 text-primary hover:bg-primary/20">
-                      <ArrowRight className="h-4 w-4" />
+                    <Link to="/admin/applications?status=pending" className="rounded-full bg-primary/10 p-2 text-primary hover:bg-primary/20">
+                      <ArrowRight className="h-4 w-4 rtl:rotate-180" />
                     </Link>
                   </div>
                 ))}

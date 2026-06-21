@@ -6,6 +6,7 @@ app_name = "scraping"
 
 urlpatterns = [
     path("start/", views.StartScrapingView.as_view(), name="start"),
+    path("start-all/", views.StartAllScrapingView.as_view(), name="start-all"),
     path("jobs/", views.ScrapingJobListView.as_view(), name="job-list"),
     path("jobs/<int:job_id>/cancel/", views.CancelScrapingView.as_view(), name="cancel"),
     path("alerts/", views.ScrapingAlertListView.as_view(), name="alert-list"),

@@ -16,6 +16,7 @@ from .serializers import (
     ApplicationListSerializer,
     ApplicationReviewSerializer,
     ApplicationUpdateSerializer,
+    BulkShortlistSerializer,
 )
 
 
@@ -105,6 +106,36 @@ class AdminApplicationListView(APIView):
         return paginator.get_paginated_response(ApplicationListSerializer(page, many=True).data)
 
 
+class AdminShortlistView(APIView):
+    """Dedicated view of the shortlist pool — separates 'still deciding'
+    from the raw pending queue so admins have a clear working set when
+    comparing finalists before picking a winner."""
+
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    @extend_schema(responses={200: ApplicationListSerializer(many=True)}, tags=["Applications"])
+    def get(self, request):
+        apps = selectors.get_shortlisted_applications(
+            opportunity_id=request.query_params.get("opportunity_id"),
+        )
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(apps, request)
+        return paginator.get_paginated_response(ApplicationListSerializer(page, many=True).data)
+
+
+class BulkShortlistView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    @extend_schema(request=BulkShortlistSerializer, tags=["Applications"])
+    def post(self, request):
+        serializer = BulkShortlistSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = services.bulk_shortlist(
+            application_ids=serializer.validated_data["ids"], admin_user=request.user
+        )
+        return Response({"success": True, **result})
+
+
 class AdminApplicationDetailView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
@@ -139,6 +170,12 @@ class ReviewApplicationView(APIView):
             )
         elif action == "in_review":
             app = services.set_in_review(application=app, admin_user=request.user)
+        elif action == "shortlist":
+            app = services.shortlist_application(
+                application=app,
+                admin_user=request.user,
+                comment=serializer.validated_data.get("comment", ""),
+            )
 
         return Response(ApplicationDetailSerializer(app).data)
 

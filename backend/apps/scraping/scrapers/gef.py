@@ -1,8 +1,17 @@
 """GEF scraper — Global Environment Facility project database.
 
 The projects table is fully server-rendered, so no browser automation is
-needed. Filtered to Mauritania national projects by default via the site's
-facet (project_country_national:105).
+needed. Filtered to Mauritania national projects via the site's facet
+(project_country_national:105). The facet does the heavy lifting, but we
+defensively re-check is_mauritania_project() in case the facet ever returns
+stray non-Mauritania rows (some funder sites leak regional/multi-country
+projects into a single-country facet).
+
+Runs until the source returns an empty page — no max_pages cap. Only
+projects with BOTH a financed grant amount AND an active (non-expired)
+deadline are kept, per product requirements; GEF doesn't expose hard
+application deadlines for most projects, so the deadline check effectively
+only screens out the (rare) rows that do specify one and it has passed.
 
 On 403 responses the scraper rotates the User-Agent and retries once before
 giving up on that page, since GEF uses lightweight bot detection.
@@ -23,7 +32,7 @@ class GEFScraper(BaseScraper):
     SOURCE_NAME = "GEF"
     BASE_URL = "https://www.thegef.org/projects-operations/database"
     DETAIL_BASE = "https://www.thegef.org"
-    COUNTRY_FACET_ID = 105
+    COUNTRY_FACET_ID = 105  # Mauritania facet on thegef.org
 
     def _get_page(self, url, params):
         """GET with one UA-rotation retry on 403."""
@@ -46,12 +55,11 @@ class GEFScraper(BaseScraper):
                 raise
         return None
 
-    def scrape(self, max_pages=5, progress_callback=None):
+    def scrape(self, progress_callback=None):
         projects = []
-        for page in range(max_pages):
-            params = {}
-            if self.COUNTRY_FACET_ID is not None:
-                params["f[0]"] = f"project_country_national:{self.COUNTRY_FACET_ID}"
+        page = 0
+        while page < self.safety_max_pages:
+            params = {"f[0]": f"project_country_national:{self.COUNTRY_FACET_ID}"}
             if page > 0:
                 params["page"] = page
 
@@ -71,6 +79,7 @@ class GEFScraper(BaseScraper):
                 if not rows:
                     break
 
+                page_kept = 0
                 for row in rows:
                     cells = row.find_all("td")
                     if len(cells) < 9:
@@ -99,6 +108,10 @@ class GEFScraper(BaseScraper):
                     cofinancing = self.parse_amount(cells[7].get_text(strip=True))
                     status = cells[8].get_text(strip=True)
 
+                    # Defensive re-check — facet should already guarantee this.
+                    if not self.keep_if_mauritania(countries, title):
+                        continue
+
                     project = {
                         "title": title,
                         "url": href,
@@ -109,7 +122,8 @@ class GEFScraper(BaseScraper):
                             f"Agency: {agencies or 'N/A'}. "
                             f"Status: {status or 'N/A'}."
                         ),
-                        "country": countries,
+                        "country": "Mauritania",
+                        "city": self.extract_city(title, focal_area),
                         "amount": grant,
                         "currency": "USD",
                         "metadata": {
@@ -125,11 +139,17 @@ class GEFScraper(BaseScraper):
                     project["funding_type"] = self.classify_funding_type(f"{title} {focal_area}")
                     project["hash"] = self.generate_hash(title, href, gef_id)
                     project["completeness_score"] = self.calculate_completeness_score(project)
+
+                    if not self.has_financed_amount_and_active_deadline(project):
+                        continue
+
                     projects.append(project)
+                    page_kept += 1
 
                 if progress_callback:
-                    progress_callback(page + 1, max_pages, len(projects))
+                    progress_callback(page + 1, None, len(projects))
                 self.sleep()
+                page += 1
 
             except Exception as e:  # noqa: BLE001
                 logger.error(f"GEF scraping error page {page}: {e}")

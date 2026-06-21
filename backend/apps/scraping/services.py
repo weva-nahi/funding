@@ -29,13 +29,16 @@ SCRAPER_MAPPING = {
     "eu": EUGlobalGatewayScraper,
 }
 
+ALL_SOURCES = list(SCRAPER_MAPPING.keys())
 
-def run_scraper(*, source: str, max_pages: int = 5, progress_callback=None):
+
+def run_scraper(*, source: str, progress_callback=None):
+    """Run a single named scraper to completion (no page limit)."""
     scraper_class = SCRAPER_MAPPING.get(source.lower())
     if not scraper_class:
         raise ValueError(f"Unknown source: {source}. Available: {list(SCRAPER_MAPPING.keys())}")
     scraper = scraper_class()
-    return scraper.scrape(max_pages=max_pages, progress_callback=progress_callback)
+    return scraper.scrape(progress_callback=progress_callback)
 
 
 def save_projects(*, projects: list, job: ScrapingJob):
@@ -49,7 +52,8 @@ def save_projects(*, projects: list, job: ScrapingJob):
             title=project_data.get("title", ""),
             source=project_data.get("source", ""),
             description=project_data.get("description", ""),
-            country=project_data.get("country", ""),
+            country=project_data.get("country", "Mauritania"),
+            city=project_data.get("city", ""),
             amount=project_data.get("amount"),
             currency=project_data.get("currency", "USD"),
             deadline=project_data.get("deadline"),

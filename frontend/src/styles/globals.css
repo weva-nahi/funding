@@ -65,11 +65,6 @@
 }
 
 /* ─── Keyframe Definitions ───────────────────────────────────────────────── */
-/*
-  These @keyframes are referenced by the animation utilities below.
-  They must be declared at root level (not inside @layer) so browsers
-  can find them regardless of Tailwind layer ordering.
-*/
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -100,12 +95,6 @@
 }
 
 /* ─── Custom Utility Classes ─────────────────────────────────────────────── */
-/*
-  IMPORTANT: placing these in @layer utilities ensures Tailwind JIT includes
-  them in the production bundle even when they only appear in dynamic
-  className strings (e.g. className="animate-fade-in").
-  Without @layer utilities, JIT drops them from production builds.
-*/
 @layer utilities {
   .animate-fade-in {
     animation: fade-in 0.5s ease-out both;
@@ -119,7 +108,6 @@
     animation: pulse-glow 2s ease-in-out infinite;
   }
 
-  /* Staggered entry animation for lists */
   .animate-stagger > * {
     animation: fade-in 0.5s ease-out both;
   }
@@ -150,6 +138,60 @@
   background: hsl(var(--muted-foreground) / 0.5);
 }
 
+/* ─── RTL Completeness ───────────────────────────────────────────────────── *
+ * Several places in the app used directional utilities (ml-/mr-, pl-/pr-,
+ * left-/right-, text-left/text-right) that don't flip automatically under
+ * `dir="rtl"`. Logical-property utilities (ms-/me-, ps-/pe-, start-/end-)
+ * were substituted directly in component markup wherever feasible (see
+ * LanguageSwitcher, ClientLayout, AdminLayout above). The rules below catch
+ * the remaining cases that come from third-party components (Radix primitives,
+ * react-dropzone, tiptap) which hardcode physical-direction inline styles or
+ * classes that can't be edited at the component-prop level.
+ */
+[dir="rtl"] .tiptap-editor .ProseMirror blockquote {
+  border-left: none;
+  border-right: 4px solid hsl(var(--primary) / 0.4);
+  padding-left: 0;
+  padding-right: 1rem;
+}
+
+[dir="rtl"] .tiptap-editor .ProseMirror ul,
+[dir="rtl"] .tiptap-editor .ProseMirror ol {
+  padding-left: 0;
+  padding-right: 1.5rem;
+}
+
+/* Radix dropdown/select/popover content sometimes anchors with a hardcoded
+   `left` inline style computed from LTR geometry. Flipping the transform
+   origin keeps the open/close animation visually consistent in RTL. */
+[dir="rtl"] [data-radix-popper-content-wrapper] {
+  --radix-popper-transform-origin: right top;
+}
+
+/* Toast notifications slide in from the inline-end edge regardless of
+   direction, rather than hardcoding the visual right edge. */
+[dir="rtl"] .animate-slide-in {
+  animation-name: slide-in-rtl;
+}
+
+@keyframes slide-in-rtl {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Numeric/currency values stay LTR even inside an RTL document — financial
+   amounts and dates read incorrectly if mirrored (e.g. "1,000,000 $" must
+   not reverse to "$ 000,000,1"). */
+[dir="rtl"] .ltr-numeric {
+  direction: ltr;
+  unicode-bidi: embed;
+  display: inline-block;
+}
+
 /* ─── TipTap Rich Text Editor ────────────────────────────────────────────── */
 .tiptap-editor .ProseMirror {
   @apply min-h-[200px] p-4 focus:outline-none;
@@ -161,6 +203,10 @@
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+[dir="rtl"] .tiptap-editor .ProseMirror p.is-editor-empty:first-child::before {
+  float: right;
 }
 
 .tiptap-editor .ProseMirror h2 {

@@ -7,6 +7,8 @@ import re
 import time
 from abc import ABC, abstractmethod
 
+from common.utils.mauritania import extract_mauritania_city, is_mauritania_project
+
 logger = logging.getLogger(__name__)
 
 # A pool of realistic browser User-Agent strings used to rotate on each
@@ -40,6 +42,13 @@ _USER_AGENTS = [
     ),
 ]
 
+# Hard ceiling purely as a runaway-loop safety net — NOT a product limit.
+# Sources are expected to exhaust (return an empty page) long before this,
+# since each scraper is now filtered to Mauritania-only results. This exists
+# only so a misbehaving source (e.g. one that never returns an empty page)
+# can't loop forever and starve the scraping worker.
+_SAFETY_MAX_PAGES = 500
+
 
 class BaseScraper(ABC):
     SOURCE_NAME = None
@@ -64,8 +73,62 @@ class BaseScraper(ABC):
         self.headers = self._make_headers()
 
     @abstractmethod
-    def scrape(self, max_pages=5, progress_callback=None):
-        """Scrape and return a list of project dicts."""
+    def scrape(self, progress_callback=None):
+        """Scrape and return a list of project dicts.
+
+        No max_pages parameter — scrapers run until the source returns no
+        more results (or _SAFETY_MAX_PAGES is hit as a runaway-loop guard).
+        Mauritania-only filtering happens inside each scraper via
+        self.keep_if_mauritania() below.
+        """
+
+    @property
+    def safety_max_pages(self) -> int:
+        return _SAFETY_MAX_PAGES
+
+    # ── Mauritania filtering ────────────────────────────────────────────
+    def keep_if_mauritania(self, *texts: str) -> bool:
+        """Call with every relevant text field for a scraped item. Returns
+        True only if the item references Mauritania — scrapers must skip
+        (continue) any item where this returns False."""
+        return is_mauritania_project(*texts)
+
+    def extract_city(self, *texts: str) -> str:
+        """Best-effort extraction of the targeted Mauritanian city/locality."""
+        return extract_mauritania_city(*texts)
+
+    # ── Financing / deadline filtering ──────────────────────────────────
+    def has_financed_amount_and_active_deadline(self, project: dict) -> bool:
+        """Per the product requirement: only keep scraped projects that
+        BOTH have a financed amount AND have a deadline that is still in
+        the future (or no deadline requirement was specified by the source
+        at all — handled by the caller, this method only validates rows
+        that claim to have a deadline).
+
+        Returns True if the project should be kept.
+        """
+        import datetime
+
+        amount = project.get("amount")
+        if not amount or float(amount) <= 0:
+            return False
+
+        deadline = project.get("deadline")
+        if not deadline:
+            # No deadline data available from the source — we still want
+            # the opportunity if it has financing, since not all funders
+            # expose a hard deadline (e.g. rolling-basis grants). The
+            # "active deadline" requirement only excludes EXPIRED deadlines,
+            # it doesn't exclude opportunities with NO stated deadline.
+            return True
+
+        if isinstance(deadline, str):
+            try:
+                deadline = datetime.date.fromisoformat(deadline)
+            except (ValueError, TypeError):
+                return True  # unparsable date — don't drop the row over it
+
+        return deadline >= datetime.date.today()
 
     # ── Hashing / scoring ─────────────────────────────────────────────
     def generate_hash(self, title, url, extra=""):
