@@ -1,29 +1,49 @@
-import { Link } from 'react-router-dom'
-import { Globe, Zap, Shield, ArrowRight, Search, FileText, CheckCircle } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Globe, Zap, Shield, ArrowRight, Search, FileText, CheckCircle, Database, Users, TrendingUp } from 'lucide-react'
+import { useAuthStore } from '@/store'
+import { SOURCE_LOGOS } from '@/lib/sourceLogos'
 
-const sources = ['GEF', 'GCF', 'World Bank', 'AFD', 'EU', 'OECD']
+const sources = [
+  { key: 'GEF', label: 'GEF' },
+  { key: 'GCF', label: 'GCF' },
+  { key: 'WORLD_BANK', label: 'World Bank' },
+  { key: 'OECD', label: 'OECD' },
+]
+
+const stats = [
+  { label: 'Funding Sources Monitored', value: '4', icon: Database },
+  { label: 'Countries Covered', value: '1', icon: Globe },
+  { label: 'Expert Consultants', value: '10+', icon: Users },
+  { label: 'Application Tracking', value: 'Real-time', icon: TrendingUp },
+]
 
 export function HomePage() {
+  const { user, isAuthenticated } = useAuthStore()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      navigate(user.role === 'admin' ? '/admin' : '/dashboard', { replace: true })
+    }
+  }, [isAuthenticated, user, navigate])
+
   return (
     <div>
-      {/* Hero */}
       <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-teal-900 to-slate-900 py-24 lg:py-32">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZyIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48Y2lyY2xlIGN4PSIxIiBjeT0iMSIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3QgZmlsbD0idXJsKCNnKSIgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiLz48L3N2Zz4=')] opacity-40" />
         <div className="container relative">
           <div className="mx-auto max-w-3xl text-center">
             <div className="animate-fade-in">
-              <span className="inline-flex items-center gap-2 rounded-full bg-teal-500/20 px-4 py-1.5 text-sm font-medium text-teal-300 ring-1 ring-teal-500/30 mb-6">
-                <Zap className="h-3.5 w-3.5" /> Powered by Richat Partners
-              </span>
               <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl">
-                Unlock <span className="bg-gradient-to-r from-teal-400 to-emerald-400 bg-clip-text text-transparent">Climate Finance</span> for Mauritania
+                Access <span className="bg-gradient-to-r from-teal-400 to-emerald-400 bg-clip-text text-transparent">Climate Finance</span> for Your Business
               </h1>
               <p className="mt-6 text-lg text-slate-300 max-w-2xl mx-auto">
-                Richat Funding Tracker connects Mauritanian businesses to international climate funding — GEF, GCF, World Bank, AFD, and more. We automate discovery, simplify applications, and track everything.
+                Richat Funding Tracker automatically discovers international climate funding opportunities from GEF, GCF, World Bank, OECD and helps you apply and track your progress in one place.
               </p>
               <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/register" className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-500 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-teal-500/25 hover:bg-teal-400 transition-all hover:shadow-teal-500/40">
-                  Start Free <ArrowRight className="h-5 w-5" />
+                  Get Started Free <ArrowRight className="h-5 w-5" />
                 </Link>
                 <Link to="/opportunities" className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 backdrop-blur px-8 py-3.5 text-base font-semibold text-white ring-1 ring-white/20 hover:bg-white/20 transition-all">
                   Browse Opportunities
@@ -34,49 +54,111 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* Sources */}
-      <section className="border-b py-8 bg-white">
+      <section className="border-b py-10 bg-white">
         <div className="container">
-          <p className="text-center text-sm text-muted-foreground mb-4">Aggregating funding from global climate institutions</p>
-          <div className="flex flex-wrap justify-center gap-8">
+          <p className="text-center text-sm font-medium text-muted-foreground mb-6">Automatically monitoring these international funding sources</p>
+          <div className="flex flex-wrap justify-center items-center gap-10">
             {sources.map(s => (
-              <span key={s} className="text-lg font-bold text-muted-foreground/50 hover:text-primary transition-colors">{s}</span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section className="py-20 bg-muted/30">
-        <div className="container">
-          <h2 className="text-3xl font-bold text-center mb-4">How It Works</h2>
-          <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">Three simple steps to access international climate financing</p>
-          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-            {[
-              { icon: Search, title: 'Discover', desc: 'Browse curated climate funding opportunities from 7+ international sources, filtered for relevance.' },
-              { icon: FileText, title: 'Apply', desc: 'Submit applications with our guided 3-step wizard. Auto-save ensures you never lose progress.' },
-              { icon: CheckCircle, title: 'Track', desc: 'Monitor your applications in real-time. Get instant notifications on status changes.' },
-            ].map(({ icon: Icon, title, desc }, i) => (
-              <div key={i} className="relative rounded-2xl bg-white p-8 shadow-sm border hover:shadow-lg transition-all group">
-                <div className="absolute -top-4 left-8 h-8 w-8 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white text-sm font-bold">{i + 1}</div>
-                <Icon className="h-10 w-10 text-primary mb-4 group-hover:scale-110 transition-transform" />
-                <h3 className="text-xl font-semibold mb-2">{title}</h3>
-                <p className="text-muted-foreground text-sm">{desc}</p>
+              <div key={s.key} className="flex flex-col items-center gap-2 opacity-70 hover:opacity-100 transition-opacity grayscale hover:grayscale-0">
+                <img src={SOURCE_LOGOS[s.key]} alt={s.label} className="h-12 w-auto object-contain" />
+                <span className="text-xs font-medium text-muted-foreground">{s.label}</span>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Services */}
+      <section className="py-16 bg-muted/30">
+        <div className="container">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 max-w-4xl mx-auto">
+            {stats.map(({ label, value, icon: Icon }) => (
+              <div key={label} className="rounded-xl bg-white border p-6 text-center shadow-sm">
+                <Icon className="h-8 w-8 text-primary mx-auto mb-3" />
+                <p className="text-3xl font-extrabold text-foreground">{value}</p>
+                <p className="text-xs text-muted-foreground mt-1">{label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="py-20 bg-white">
         <div className="container">
-          <h2 className="text-3xl font-bold text-center mb-12">Our Services</h2>
+          <h2 className="text-3xl font-bold text-center mb-4">How It Works</h2>
+          <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
+            From discovery to approval, we handle the complexity so you can focus on your project.
+          </p>
+          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+            {[
+              {
+                icon: Search,
+                title: 'Automated Discovery',
+                desc: 'Our scrapers continuously monitor 4 international funding databases and surface only opportunities relevant to Mauritania with confirmed amounts and deadlines.',
+              },
+              {
+                icon: FileText,
+                title: 'Simple Applications',
+                desc: 'Apply with a structured motivation letter and supporting documents. Track every status update in real time, with direct messaging to our review team.',
+              },
+              {
+                icon: CheckCircle,
+                title: 'Expert Support',
+                desc: 'Richat Partners consultants review applications and provide guidance through our built-in consulting channel.',
+              },
+            ].map(({ icon: Icon, title, desc }, i) => (
+              <div key={i} className="relative rounded-2xl bg-muted/50 p-8 hover:shadow-md transition-all group border">
+                <div className="absolute -top-4 left-8 h-8 w-8 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white text-sm font-bold">{i + 1}</div>
+                <Icon className="h-10 w-10 text-primary mb-4 mt-2 group-hover:scale-110 transition-transform" />
+                <h3 className="text-xl font-semibold mb-2">{title}</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="py-20 bg-muted/30">
+        <div className="container">
+          <h2 className="text-3xl font-bold text-center mb-4">What We Track</h2>
+          <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
+            We focus exclusively on funding compatible with ethical finance principles: grants, concessional financing, and blended finance.
+          </p>
+          <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            {[
+              { title: 'Grants', desc: 'Non-repayable funds from international climate institutions for qualifying projects.' },
+              { title: 'Concessional Finance', desc: 'Below-market-rate financing with favorable terms for sustainable development.' },
+              { title: 'Blended Finance', desc: 'Combinations of public grants and private capital structured to maximize impact.' },
+            ].map(({ title, desc }) => (
+              <div key={title} className="rounded-xl bg-white border p-6 shadow-sm">
+                <div className="h-2 w-12 bg-gradient-to-r from-teal-500 to-teal-700 rounded-full mb-4" />
+                <h3 className="font-semibold text-lg mb-2">{title}</h3>
+                <p className="text-sm text-muted-foreground">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="py-20 bg-white">
+        <div className="container">
+          <h2 className="text-3xl font-bold text-center mb-12">Platform Features</h2>
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {[
-              { icon: Globe, title: 'Opportunity Matching', desc: 'AI-powered matching of your business profile with relevant funding opportunities from global sources.' },
-              { icon: Shield, title: 'Expert Consulting', desc: 'Richat Partners provides hands-on guidance to strengthen your applications and maximize success rates.' },
-              { icon: Zap, title: 'Real-time Tracking', desc: 'Live notifications, status updates, and deadline reminders so you never miss an opportunity.' },
+              {
+                icon: Globe,
+                title: 'Multi-Source Monitoring',
+                desc: 'GEF, GCF, World Bank, OECD - all in one dashboard. No more manually checking different websites.',
+              },
+              {
+                icon: Shield,
+                title: 'Expert Consulting',
+                desc: 'Richat Partners provides hands-on guidance to strengthen your applications and improve your chances of approval.',
+              },
+              {
+                icon: Zap,
+                title: 'Real-time Notifications',
+                desc: 'Instant alerts when your application status changes, new matching opportunities appear, or deadlines approach.',
+              },
             ].map(({ icon: Icon, title, desc }, i) => (
               <div key={i} className="rounded-2xl bg-gradient-to-br from-muted/50 to-muted p-8 hover:shadow-md transition-all">
                 <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
@@ -90,16 +172,23 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* CTA */}
       <section className="py-20 bg-gradient-to-r from-teal-600 to-teal-800">
         <div className="container text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">Ready to access climate finance?</h2>
-          <p className="text-teal-100 mb-8 max-w-xl mx-auto">Join dozens of Mauritanian businesses already using Richat Funding Tracker to secure international funding.</p>
+          <h2 className="text-3xl font-bold text-white mb-4">Ready to find your funding?</h2>
+          <p className="text-teal-100 mb-8 max-w-xl mx-auto">
+            Join Mauritanian businesses using Richat Funding Tracker to discover and apply for international climate finance.
+          </p>
           <Link to="/register" className="inline-flex items-center gap-2 rounded-xl bg-white px-8 py-3.5 text-base font-semibold text-teal-700 shadow-lg hover:bg-teal-50 transition-all">
             Create Free Account <ArrowRight className="h-5 w-5" />
           </Link>
         </div>
       </section>
+
+      <footer className="border-t py-8 bg-white">
+        <div className="container text-center text-sm text-muted-foreground">
+          <p>2026 Richat Partners, Nouakchott, Mauritania. All rights reserved.</p>
+        </div>
+      </footer>
     </div>
   )
 }

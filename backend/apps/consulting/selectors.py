@@ -15,4 +15,4 @@ def get_all_requests(*, status=None, priority=None):
 
 
 def get_request_by_id(*, request_id):
-    return ConsultingRequest.objects.select_related("user", "user__profile", "responded_by").get(id=request_id)
+    return ConsultingRequest.objects.select_related("user", "user__profile").get(id=request_id)

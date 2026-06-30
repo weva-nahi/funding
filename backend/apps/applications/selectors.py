@@ -1,9 +1,8 @@
 """Application selectors."""
 
-from datetime import timedelta
-
 from django.db.models import Count, Q
 from django.db.models.functions import TruncMonth
+from datetime import timedelta
 from django.utils import timezone
 
 from .models import Application, ApplicationStatusHistory
@@ -31,15 +30,13 @@ def get_all_applications(*, status_filter=None, search=None):
 
 def get_pending_applications():
     return (
-        Application.objects.filter(status__in=["pending", "in_review"])
+        Application.objects.filter(status="pending")
         .select_related("user", "opportunity")
         .order_by("-created_at")
     )
 
 
 def get_shortlisted_applications(*, opportunity_id=None):
-    """Applications currently in the shortlist pool — the admin's working
-    set when comparing finalists before picking a winner."""
     qs = (
         Application.objects.filter(status="shortlisted")
         .select_related("user", "opportunity", "user__profile")
@@ -59,14 +56,3 @@ def get_application_timeline(*, application_id: int):
 
 def get_application_stats():
     return Application.objects.values("status").annotate(count=Count("id"))
-
-
-def get_monthly_stats(*, months=6):
-    since = timezone.now() - timedelta(days=months * 30)
-    return (
-        Application.objects.filter(created_at__gte=since)
-        .annotate(month=TruncMonth("created_at"))
-        .values("month", "status")
-        .annotate(count=Count("id"))
-        .order_by("month")
-    )

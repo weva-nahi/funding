@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import api from '@/lib/axios'
 import { useDebounce } from '@/hooks/useDebounce'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { formatDate, daysUntil } from '@/utils/formatDate'
-import { SOURCES, FUNDING_TYPES, MAURITANIA_CITIES, SECTORS, AMOUNT_STEP } from '@/lib/constants'
+import { SOURCES, FUNDING_TYPES, MAURITANIA_WILAYAS as MAURITANIA_CITIES, SECTORS, AMOUNT_STEP } from '@/lib/constants'
+import { getSourceLogo } from '@/lib/sourceLogos'
 import { Search, Globe, Calendar, DollarSign, Bookmark, BookmarkCheck, Filter, X, MapPin } from 'lucide-react'
 import type { Opportunity, Paginated } from '@/types'
 
 export function OpportunitiesPage() {
+  const { t } = useTranslation()
   const [searchParams, setSearchParams] = useSearchParams()
   const savedTab = searchParams.get('saved') === 'true'
 
@@ -81,8 +84,8 @@ export function OpportunitiesPage() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Funding Opportunities</h1>
-          <p className="text-muted-foreground mt-1">Browse and apply for climate funding in Mauritania</p>
+          <h1 className="text-2xl font-bold tracking-tight">{t('opportunities.title')}</h1>
+          <p className="text-muted-foreground mt-1">{t('opportunities.subtitle')}</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -92,7 +95,7 @@ export function OpportunitiesPage() {
             }`}
           >
             <Bookmark className="h-4 w-4" />
-            {savedTab ? 'Browsing Saved' : 'Saved'}
+            {savedTab ? t('opportunities.browsingSaved') : t('nav.saved')}
           </button>
         </div>
       </div>
@@ -102,19 +105,19 @@ export function OpportunitiesPage() {
           <div className="flex flex-wrap gap-3">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input type="text" placeholder="Search opportunities..." value={search}
+              <input type="text" placeholder={t('common.search')} value={search}
                 onChange={e => { setSearch(e.target.value); setPage(1) }}
                 className="w-full rounded-lg border ps-10 pe-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
             </div>
             <select value={source} onChange={e => { setSource(e.target.value); setPage(1) }}
               className="rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white">
-              <option value="">All Sources</option>
+              <option value="">{t('opportunities.allSources')}</option>
               {SOURCES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
             <select value={fundingType} onChange={e => { setFundingType(e.target.value); setPage(1) }}
               className="rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white">
-              <option value="">All Types</option>
-              {FUNDING_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              <option value="">{t('opportunities.allTypes')}</option>
+              {FUNDING_TYPES.map(ft => <option key={ft.value} value={ft.value}>{ft.label}</option>)}
             </select>
             <button
               onClick={() => setShowFilters(v => !v)}
@@ -123,7 +126,7 @@ export function OpportunitiesPage() {
               }`}
             >
               <Filter className="h-4 w-4" />
-              Filters{hasActiveFilters ? ' •' : ''}
+              {t('opportunities.filters')}{hasActiveFilters ? ' •' : ''}
             </button>
           </div>
 
@@ -132,30 +135,30 @@ export function OpportunitiesPage() {
               <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
-                    <MapPin className="h-3 w-3" /> City / Region
+                    <MapPin className="h-3 w-3" /> {t('opportunities.cityRegion')}
                   </label>
                   <select value={city} onChange={e => { setCity(e.target.value); setPage(1) }}
                     className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white">
-                    <option value="">All Mauritania</option>
+                    <option value="">{t('opportunities.allMauritania')}</option>
                     {MAURITANIA_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">Sector</label>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">{t('common.sector')}</label>
                   <select value={sector} onChange={e => { setSector(e.target.value); setPage(1) }}
                     className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white">
-                    <option value="">All Sectors</option>
+                    <option value="">{t('opportunities.allSectors')}</option>
                     {SECTORS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">Min Amount (USD)</label>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">{t('opportunities.minAmount')}</label>
                   <input type="number" step={AMOUNT_STEP} placeholder="0" value={amountMin}
                     onChange={e => { setAmountMin(e.target.value); setPage(1) }}
                     className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">Max Amount (USD)</label>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">{t('opportunities.maxAmount')}</label>
                   <input type="number" step={AMOUNT_STEP} placeholder="∞" value={amountMax}
                     onChange={e => { setAmountMax(e.target.value); setPage(1) }}
                     className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
@@ -165,11 +168,11 @@ export function OpportunitiesPage() {
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input type="checkbox" checked={hasDeadline} onChange={e => { setHasDeadline(e.target.checked); setPage(1) }}
                     className="rounded border-gray-300 text-primary" />
-                  Only show opportunities with a deadline
+                  {t('opportunities.hasDeadlineOnly')}
                 </label>
                 {hasActiveFilters && (
                   <button onClick={resetFilters} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-                    <X className="h-3.5 w-3.5" /> Reset filters
+                    <X className="h-3.5 w-3.5" /> {t('opportunities.resetFilters')}
                   </button>
                 )}
               </div>
@@ -183,20 +186,20 @@ export function OpportunitiesPage() {
           {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="h-48 rounded-xl bg-muted animate-pulse" />)}
         </div>
       ) : isError ? (
-        <div className="text-center py-12 text-red-600">Failed to load opportunities. Please try again.</div>
+        <div className="text-center py-12 text-red-600">{t('errors.loadFailed')}</div>
       ) : (
         <>
           <p className="text-sm text-muted-foreground">
-            {savedTab ? `${data?.count ?? 0} saved opportunities` : `${data?.count ?? 0} opportunities found`}
+            {savedTab ? t('opportunities.savedCount', { count: data?.count ?? 0 }) : t('opportunities.found', { count: data?.count ?? 0 })}
           </p>
           {(data?.results?.length ?? 0) === 0 ? (
             <div className="text-center py-16 text-muted-foreground">
               <Bookmark className="mx-auto h-12 w-12 mb-3 opacity-20" />
-              <p>{savedTab ? 'No saved opportunities yet.' : 'No opportunities found matching your filters.'}</p>
+              <p>{savedTab ? t('opportunities.noSaved') : t('opportunities.noOpportunitiesFiltered')}</p>
               {savedTab && (
                 <button onClick={() => { setSearchParams({}); setPage(1) }}
                   className="mt-3 text-primary hover:underline text-sm">
-                  Browse all opportunities
+                  {t('opportunities.browseAll')}
                 </button>
               )}
             </div>
@@ -204,6 +207,7 @@ export function OpportunitiesPage() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {data?.results?.map((opp) => {
                 const days = daysUntil(opp.deadline ?? null)
+                const logo = getSourceLogo(opp.source)
                 return (
                   <Link key={opp.id} to={`/opportunities/${opp.id}`}
                     className="group relative rounded-xl border bg-white p-6 shadow-sm hover:shadow-lg hover:border-primary/30 transition-all">
@@ -211,7 +215,7 @@ export function OpportunitiesPage() {
                       onClick={(e) => toggleSaved(opp, e)}
                       disabled={saveMutation.isPending}
                       className="absolute top-4 end-4 p-1.5 rounded-full hover:bg-muted transition-colors"
-                      title={opp.is_saved ? 'Remove from saved' : 'Save for later'}
+                      title={opp.is_saved ? t('opportunities.saved') : t('opportunities.saveForLater')}
                     >
                       {opp.is_saved
                         ? <BookmarkCheck className="h-4 w-4 text-primary" />
@@ -220,6 +224,7 @@ export function OpportunitiesPage() {
                     </button>
 
                     <div className="flex items-center gap-2 mb-3 pe-8">
+                      {logo && <img src={logo} alt={opp.source} className="h-5 w-5 rounded object-contain" />}
                       <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">{opp.source}</span>
                       {opp.funding_type && (
                         <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">{opp.funding_type}</span>
@@ -237,7 +242,7 @@ export function OpportunitiesPage() {
                         <div className="flex items-center gap-2">
                           <Calendar className="h-3.5 w-3.5" />
                           <span className={days != null && days <= 7 ? 'text-red-600 font-medium' : ''}>
-                            {formatDate(opp.deadline)}{days != null && days > 0 ? ` (${days}d)` : days != null && days <= 0 ? ' (Expired)' : ''}
+                            {formatDate(opp.deadline)}{days != null && days > 0 ? ` (${days}d)` : days != null && days <= 0 ? ` (${t('opportunities.expired')})` : ''}
                           </span>
                         </div>
                       )}
@@ -255,10 +260,10 @@ export function OpportunitiesPage() {
           {(data?.count ?? 0) > 0 && (
             <div className="flex justify-center gap-2 pt-4">
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={!data?.previous}
-                className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50 hover:bg-muted transition-colors">Previous</button>
-              <span className="flex items-center px-4 text-sm text-muted-foreground">Page {page}</span>
+                className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50 hover:bg-muted transition-colors">{t('common.previous')}</button>
+              <span className="flex items-center px-4 text-sm text-muted-foreground">{t('common.page')} {page}</span>
               <button onClick={() => setPage(p => p + 1)} disabled={!data?.next}
-                className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50 hover:bg-muted transition-colors">Next</button>
+                className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50 hover:bg-muted transition-colors">{t('common.next')}</button>
             </div>
           )}
         </>

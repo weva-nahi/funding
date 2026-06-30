@@ -28,21 +28,17 @@ class PublicOpportunityListView(APIView):
             search=request.query_params.get("search"),
             source=request.query_params.get("source"),
             country=request.query_params.get("country"),
+            wilaya=request.query_params.get("wilaya"),
             city=request.query_params.get("city"),
             amount_min=request.query_params.get("amount_min"),
             amount_max=request.query_params.get("amount_max"),
             funding_type=request.query_params.get("funding_type"),
             sector=request.query_params.get("sector"),
             min_completeness=request.query_params.get("min_completeness"),
-            has_deadline=request.query_params.get("has_deadline"),
         )
         paginator = StandardPagination()
         page = paginator.paginate_queryset(opportunities, request)
 
-        # N+1 fix: resolve every saved-id for the current user in ONE query
-        # up front (get_saved_opportunity_ids), then pass it through
-        # serializer context so get_is_saved() can do an in-memory set
-        # lookup per row instead of issuing a fresh query per opportunity.
         saved_ids = None
         if request.user and request.user.is_authenticated:
             saved_ids = selectors.get_saved_opportunity_ids(user=request.user)
@@ -63,8 +59,6 @@ class OpportunityDetailView(APIView):
             FundingOpportunitySerializer(opportunity, context={"request": request}).data
         )
 
-
-# ─── Save-for-later ───────────────────────────────────────────────────────────
 
 class SavedOpportunityListView(APIView):
     permission_classes = [IsAuthenticated]
@@ -107,13 +101,7 @@ class AdminOpportunityListView(APIView):
         )
         paginator = StandardPagination()
         page = paginator.paginate_queryset(opportunities, request)
-
-        # Same N+1 fix as the public list view — this was the one place
-        # still missing it, since admins ARE authenticated users who can
-        # also save opportunities, so get_is_saved() was silently falling
-        # back to a per-row query for every admin list page-load.
         saved_ids = selectors.get_saved_opportunity_ids(user=request.user)
-
         return paginator.get_paginated_response(
             FundingOpportunityListSerializer(
                 page, many=True, context={"request": request, "saved_ids": saved_ids}
@@ -124,7 +112,12 @@ class AdminOpportunityListView(APIView):
     def post(self, request):
         serializer = OpportunityCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        opportunity = services.create_opportunity(created_by=request.user, **serializer.validated_data)
+        # All new opportunities are published immediately
+        data = dict(serializer.validated_data)
+        data["status"] = "published"
+        opportunity = services.create_opportunity(created_by=request.user, **data)
+        # Publish it immediately
+        services.publish_opportunity(opportunity=opportunity, user=request.user)
         return Response(
             FundingOpportunitySerializer(opportunity, context={"request": request}).data,
             status=status.HTTP_201_CREATED,

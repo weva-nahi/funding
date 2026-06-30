@@ -85,6 +85,15 @@
   }
 }
 
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
 @keyframes pulse-glow {
   0%, 100% {
     box-shadow: 0 0 20px rgba(14, 165, 133, 0.3);
@@ -102,6 +111,10 @@
 
   .animate-slide-in {
     animation: slide-in 0.3s ease-out both;
+  }
+
+  .animate-slide-in-right {
+    animation: slide-in-right 0.3s ease-out both;
   }
 
   .animate-pulse-glow {

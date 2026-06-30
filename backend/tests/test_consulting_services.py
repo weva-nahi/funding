@@ -1,65 +1,91 @@
-"""Tests for consulting services."""
+"""Tests for consulting services — adapted to the pure-conversation model."""
 
 import pytest
 
-from apps.consulting.services import create_request, respond_to_request
-from common.exceptions import ApplicationError
+from apps.consulting.services import add_message, close_request, create_request
+from apps.consulting.models import ConsultingRequest, ConsultingMessage
 
 
 @pytest.mark.django_db
 class TestConsultingFlow:
     def test_create_request(self, client_user):
-        req = create_request(user=client_user, description="I need help with GEF application.", priority="high")
+        req = create_request(
+            user=client_user,
+            description="I need help with GEF application.",
+            priority="high",
+        )
         assert req.pk is not None
         assert req.status == "pending"
         assert req.priority == "high"
 
-    def test_resolve_request(self, client_user, admin_user):
-        req = create_request(user=client_user, description="I need help with GEF application.", priority="medium")
-        resolved = respond_to_request(
-            request_id=req.id,
-            admin_user=admin_user,
-            response="We have reviewed your request and can assist you with the GEF application process.",
-            action="resolve",
+    def test_add_client_message(self, client_user):
+        req = create_request(
+            user=client_user,
+            description="Initial question.",
+            priority="medium",
         )
-        assert resolved.status == "resolved"
-        assert resolved.admin_response != ""
-        assert resolved.responded_at is not None
+        msg = add_message(request_id=req.id, sender=client_user, content="Follow-up detail.")
+        assert msg.pk is not None
+        assert msg.content == "Follow-up detail."
+        assert msg.sender == client_user
 
-    def test_reject_request(self, client_user, admin_user):
-        req = create_request(user=client_user, description="Help needed.", priority="low")
-        rejected = respond_to_request(
-            request_id=req.id,
-            admin_user=admin_user,
-            response="This falls outside our current scope of services.",
-            action="reject",
+    def test_admin_reply_activates_request(self, client_user, admin_user):
+        req = create_request(
+            user=client_user,
+            description="I need help with GEF application.",
+            priority="medium",
         )
-        assert rejected.status == "rejected"
+        assert req.status == "pending"
 
-    def test_mark_in_progress(self, client_user, admin_user):
-        req = create_request(user=client_user, description="Complex request needing investigation.", priority="high")
-        in_prog = respond_to_request(
+        add_message(
             request_id=req.id,
-            admin_user=admin_user,
-            response="Under investigation.",
-            action="in_progress",
+            sender=admin_user,
+            content="We can assist you with the GEF application process.",
         )
-        assert in_prog.status == "in_progress"
-        # responded_at should NOT be set for in_progress (only for final resolutions)
-        assert in_prog.responded_at is None
+        req.refresh_from_db()
+        assert req.status == "active"
 
-    def test_cannot_respond_twice(self, client_user, admin_user):
-        req = create_request(user=client_user, description="Simple question.", priority="low")
-        respond_to_request(
-            request_id=req.id,
-            admin_user=admin_user,
-            response="Here is the answer to your question.",
-            action="resolve",
+    def test_client_message_does_not_change_status(self, client_user):
+        req = create_request(
+            user=client_user,
+            description="Help needed.",
+            priority="low",
         )
-        with pytest.raises(ApplicationError, match="already been handled"):
-            respond_to_request(
-                request_id=req.id,
-                admin_user=admin_user,
-                response="Another response attempt.",
-                action="resolve",
-            )
+        add_message(request_id=req.id, sender=client_user, content="More details here.")
+        req.refresh_from_db()
+        # Client message on a pending request keeps it pending
+        assert req.status == "pending"
+
+    def test_close_request(self, client_user, admin_user):
+        req = create_request(
+            user=client_user,
+            description="Issue to close.",
+            priority="low",
+        )
+        add_message(request_id=req.id, sender=admin_user, content="Resolved.")
+        closed = close_request(request_id=req.id)
+        assert closed.status == "closed"
+
+    def test_messages_ordered_chronologically(self, client_user, admin_user):
+        req = create_request(
+            user=client_user,
+            description="Chat test.",
+            priority="medium",
+        )
+        add_message(request_id=req.id, sender=client_user, content="First")
+        add_message(request_id=req.id, sender=admin_user, content="Second")
+        add_message(request_id=req.id, sender=client_user, content="Third")
+
+        messages = list(req.messages.all())
+        assert [m.content for m in messages] == ["First", "Second", "Third"]
+
+    def test_multiple_messages_allowed(self, client_user, admin_user):
+        req = create_request(
+            user=client_user,
+            description="Ongoing discussion.",
+            priority="high",
+        )
+        add_message(request_id=req.id, sender=admin_user, content="Reply 1")
+        add_message(request_id=req.id, sender=admin_user, content="Reply 2")
+        # No exception — multiple messages from same sender are allowed
+        assert req.messages.count() == 2

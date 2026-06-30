@@ -1,17 +1,12 @@
-"""GCF scraper — Green Climate Fund approved projects.
+"""GCF scraper — Green Climate Fund.
 
-The projects list is server-rendered (Drupal). Each project is a
-``div.card-project``; the project code lives in ``h5.card-title`` and the
-full (untruncated) title is in the ``title`` attribute of the
-``.card-project__title`` paragraph (the visible text is CSS-clamped).
-Pagination is ``?page=N`` (0-indexed; page 0 = base URL).
-
-GCF has no Mauritania-only facet on this listing page, so every project's
-country list is checked against is_mauritania_project() and non-Mauritania
-projects are skipped. Runs until the source returns an empty page.
+Plain HTTP (requests + BeautifulSoup) — the country page is server-rendered
+HTML, no JS required. Pagination via ?page=N. No fallback data.
 """
 
 import logging
+import re
+from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
@@ -23,90 +18,165 @@ logger = logging.getLogger(__name__)
 
 class GCFScraper(BaseScraper):
     SOURCE_NAME = "GCF"
-    BASE_URL = "https://www.greenclimate.fund/projects"
+    BASE_DOMAIN = "https://www.greenclimate.fund"
+    COUNTRY_URL = "https://www.greenclimate.fund/countries/mauritania"
+
+    def __init__(self, delay=1.5):
+        super().__init__(delay=delay)
+        self.session = requests.Session()
+        self.session.headers.update(self.headers)
 
     def scrape(self, progress_callback=None):
         projects = []
-        page = 0
-        while page < self.safety_max_pages:
-            url = self.BASE_URL if page == 0 else f"{self.BASE_URL}?page={page}"
-            try:
-                resp = requests.get(url, headers=self.headers, timeout=30)
-                resp.raise_for_status()
-                soup = BeautifulSoup(resp.content, "html.parser")
-                cards = soup.select("div.card-project")
-                if not cards:
-                    logger.info(f"GCF: no cards on page {page}, stopping.")
-                    break
+        try:
+            listings = self._get_all_pages_projects()
+            if not listings:
+                logger.warning("GCF: no project listings found.")
+                return []
 
-                for card in cards:
-                    code_el = card.select_one("h5.card-title")
-                    code = code_el.get_text(strip=True) if code_el else ""
+            for i, basic in enumerate(listings):
+                details = self._extract_project_details(basic["url"]) if basic.get("url") else {}
+                project = {**basic, **details}
 
-                    title_el = card.select_one(".card-project__title p")
-                    title = ""
-                    if title_el:
-                        title = (
-                            title_el.get("title") or title_el.get_text(strip=True)
-                        ).strip()
-                    title = title or code
-                    if not title:
-                        continue
+                project["hash"] = self.generate_hash(
+                    project["title"], project.get("url", ""), project.get("amount") or ""
+                )
+                project["completeness_score"] = self.calculate_completeness_score(project)
 
-                    link_el = (
-                        card.select_one("a.stretched-link")
-                        or card.select_one("a[href]")
-                    )
-                    href = link_el.get("href", "") if link_el else ""
-                    if href and not href.startswith("http"):
-                        href = f"https://www.greenclimate.fund{href}"
-
-                    country_el = card.select_one(".card-project__countries")
-                    country = (
-                        country_el.get_text(" ", strip=True) if country_el else ""
-                    )
-
-                    # Mauritania-only filter — GCF lists projects from every
-                    # country on this page, no facet to pre-filter with.
-                    if not self.keep_if_mauritania(country, title):
-                        continue
-
-                    theme_el = card.select_one(".card-project__target .badge")
-                    theme = theme_el.get_text(strip=True) if theme_el else ""
-
-                    project = {
-                        "title": title,
-                        "url": href,
-                        "source": "GCF",
-                        "description": " — ".join(
-                            [p for p in (code, theme) if p]
-                        ),
-                        "country": "Mauritania",
-                        "city": self.extract_city(title, theme),
-                        "currency": "USD",
-                        "metadata": {"code": code, "theme": theme, "raw_country": country},
-                    }
-                    project["sector"] = self.classify_sector(f"{title} {theme}")
-                    project["funding_type"] = self.classify_funding_type(
-                        f"{title} {theme}"
-                    )
-                    project["hash"] = self.generate_hash(title, href, code)
-                    project["completeness_score"] = self.calculate_completeness_score(
-                        project
-                    )
-
-                    if not self.has_financed_amount_and_active_deadline(project):
-                        continue
-
+                if self.has_financed_amount_and_active_deadline(project):
                     projects.append(project)
 
                 if progress_callback:
-                    progress_callback(page + 1, None, len(projects))
-                self.sleep()
-                page += 1
+                    progress_callback(1, None, len(projects))
 
-            except Exception as e:  # noqa: BLE001
-                logger.error(f"GCF scraping error page {page}: {e}")
+                self.sleep()
+
+        except Exception as e:
+            logger.error("GCF scraping error: %s", e)
+
+        logger.info("GCF: scraped %s projects.", len(projects))
+        return projects
+
+    def _get_page(self, url):
+        try:
+            resp = self.session.get(url, timeout=30)
+            resp.raise_for_status()
+            return BeautifulSoup(resp.content, "html.parser")
+        except requests.RequestException as e:
+            logger.warning("GCF: request failed for %s: %s", url, e)
+            return None
+
+    def _get_all_pages_projects(self):
+        all_projects = []
+        page = 0
+        while page < self.safety_max_pages:
+            url = self.COUNTRY_URL if page == 0 else f"{self.COUNTRY_URL}?page={page}"
+            soup = self._get_page(url)
+            if not soup:
                 break
 
+            page_projects = self._extract_from_table(soup)
+            if not page_projects:
+                break
+            all_projects.extend(page_projects)
+
+            pagination = soup.find("ul", class_="pager")
+            if pagination:
+                next_link = pagination.find("a", title=re.compile(r"Go to next page", re.I))
+                if not next_link:
+                    break
+            else:
+                break
+
+            page += 1
+
+        return all_projects
+
+    def _extract_from_table(self, soup):
+        projects = []
+        table = (
+            soup.find("table", class_="table")
+            or soup.find("table", class_=["views-table", "sticky-enabled"])
+            or soup.find("table")
+        )
+        if not table:
+            return projects
+
+        tbody = table.find("tbody")
+        rows = tbody.find_all("tr") if tbody else table.find_all("tr")[1:]
+
+        for row in rows:
+            cells = row.find_all("td")
+            if len(cells) < 2:
+                continue
+
+            title_cell = cells[0]
+            link_elem = title_cell.find("a")
+            if not link_elem:
+                continue
+
+            title = self.clean_text(link_elem.get_text())
+            if not title or len(title) < 5:
+                continue
+
+            url = urljoin(self.BASE_DOMAIN, link_elem.get("href", ""))
+            doc_type = self.clean_text(cells[1].get_text()) if len(cells) > 1 else ""
+
+            organisation = ""
+            for badge in title_cell.find_all("span", class_="badge"):
+                badge_text = self.clean_text(badge.get_text())
+                if badge_text and not badge_text.startswith("FP"):
+                    organisation = badge_text
+                    break
+
+            projects.append({
+                "title": title,
+                "url": url,
+                "source": "GCF",
+                "description": f"GCF funded project: {title}",
+                "country": "Mauritania",
+                "city": self.extract_city(title),
+                "amount": None,
+                "currency": "USD",
+                "funding_type": self.classify_funding_type(f"{title} {doc_type}"),
+                "sector": self.classify_sector(title),
+                "metadata": {"document_type": doc_type, "organisation": organisation},
+            })
+
         return projects
+
+    def _extract_project_details(self, url):
+        soup = self._get_page(url)
+        if not soup:
+            return {}
+
+        details = {}
+
+        download_link = soup.find("a", class_="btn-primary", href=True)
+        if download_link and download_link["href"].endswith(".pdf"):
+            details.setdefault("metadata", {})["document_url"] = download_link["href"]
+        else:
+            pdf_links = soup.find_all("a", href=re.compile(r"\.pdf$"))
+            if pdf_links:
+                details.setdefault("metadata", {})["document_url"] = pdf_links[0]["href"]
+
+        desc_elem = soup.find("div", class_="field-name-body")
+        if desc_elem:
+            p = desc_elem.find("p")
+            text = self.clean_text(p.get_text() if p else desc_elem.get_text())
+            if text:
+                details["description"] = text
+
+        for section in soup.find_all("div", class_="col-md-6"):
+            label_elem = section.find("span", class_="node-label")
+            strong_elem = section.find("strong")
+            if not label_elem or not strong_elem:
+                continue
+            label = self.clean_text(label_elem.get_text()).lower()
+            value = self.clean_text(strong_elem.get_text())
+            if "type" in label:
+                details["funding_type"] = self.classify_funding_type(value)
+            elif "funding" in label or "amount" in label:
+                details["amount"] = self.parse_amount(value)
+
+        return details

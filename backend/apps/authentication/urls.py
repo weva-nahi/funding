@@ -17,6 +17,7 @@ urlpatterns = [
     path("unsubscribe/", views.UnsubscribeView.as_view(), name="unsubscribe"),
     path("password-reset/", views.PasswordResetRequestView.as_view(), name="password-reset"),
     path("password-reset/confirm/", views.PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
+    path("verify-admin-password/", views.VerifyAdminPasswordView.as_view(), name="verify-admin-password"),
     # Authenticated
     path("me/", views.MeView.as_view(), name="me"),
     path("change-password/", views.ChangePasswordView.as_view(), name="change-password"),

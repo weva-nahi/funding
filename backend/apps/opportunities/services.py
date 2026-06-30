@@ -59,6 +59,10 @@ def _normalize_source(raw: str) -> str:
 
 
 def create_opportunity(*, created_by=None, **kwargs) -> FundingOpportunity:
+    # --- FIX START ---
+    if not kwargs.get("funding_type"):
+        kwargs["funding_type"] = "grant"
+    # --- FIX END ---
     if "hash" not in kwargs:
         kwargs["hash"] = generate_opportunity_hash(
             kwargs.get("title", ""),

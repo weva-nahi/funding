@@ -52,20 +52,36 @@ class FundingOpportunityListSerializer(serializers.ModelSerializer):
 
 
 class OpportunityCreateSerializer(serializers.ModelSerializer):
+    # Source is free text (not dropdown) — admin enters it manually
+    source = serializers.CharField(max_length=200)
+    amount = serializers.DecimalField(max_digits=20, decimal_places=2)  # Required
+    deadline = serializers.DateField()  # Required
+
     class Meta:
         model = FundingOpportunity
         fields = [
-            "title", "source", "description", "country", "city", "amount", "currency",
+            "title", "source", "description", "country", "amount", "currency",
             "deadline", "eligibility_criteria", "required_documents", "funding_type",
-            "sector", "url", "metadata", "status",
+            "sector", "url", "metadata",
         ]
+
+    def validate_funding_type(self, value):
+        from django.conf import settings
+        allowed = getattr(settings, "ISLAMIC_FINANCE_ALLOWED_TYPES", ["grant", "concessional", "blended"])
+        if value and value not in allowed:
+            raise serializers.ValidationError(
+                f"Funding type must be one of: {', '.join(allowed)}"
+            )
+        return value
 
 
 class OpportunityUpdateSerializer(serializers.ModelSerializer):
+    source = serializers.CharField(max_length=200, required=False)
+
     class Meta:
         model = FundingOpportunity
         fields = [
-            "title", "source", "description", "country", "city", "amount", "currency",
+            "title", "source", "description", "country", "amount", "currency",
             "deadline", "eligibility_criteria", "required_documents", "funding_type",
             "sector", "url", "metadata", "status",
         ]

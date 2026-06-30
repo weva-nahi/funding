@@ -69,16 +69,10 @@ class Profile(TimestampMixin):
         ("daily", "Daily Digest"),
     ]
 
-    LANGUAGE_CHOICES = [
-        ("fr", "Français"),
-        ("en", "English"),
-        ("ar", "العربية"),
-    ]
-
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     first_name = models.CharField(max_length=100, blank=True)
     last_name = models.CharField(max_length=100, blank=True)
-    company = models.CharField(max_length=255, blank=True)
+    company = models.CharField(max_length=60, blank=True)
     phone = models.CharField(max_length=20, blank=True)
     avatar = models.ImageField(upload_to="avatars/", null=True, blank=True)
     sector = models.CharField(max_length=100, blank=True)
@@ -97,16 +91,8 @@ class Profile(TimestampMixin):
         default="immediate",
     )
 
-    # Language the user wants transactional emails sent in. Defaults to
-    # 'fr' to preserve current behavior for existing accounts (all current
-    # emails are hardcoded French). New registrations set this from either
-    # an explicit `language` field on the signup form or, if omitted, the
-    # browser's Accept-Language header (see authentication/services.py).
-    preferred_language = models.CharField(
-        max_length=2,
-        choices=LANGUAGE_CHOICES,
-        default="fr",
-    )
+    # Email language is always English — no per-user preference needed
+    preferred_language = models.CharField(max_length=2, default="en")
 
     pending_digest = models.JSONField(default=list, blank=True)
 
@@ -122,8 +108,6 @@ class Profile(TimestampMixin):
 
 
 class EmailVerificationToken(models.Model):
-    """Persistent email verification tokens — survives Redis restarts."""
-
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="verification_tokens")
     token = models.CharField(max_length=64, unique=True, db_index=True)
     expires_at = models.DateTimeField()
@@ -141,8 +125,6 @@ class EmailVerificationToken(models.Model):
 
 
 class PasswordResetToken(models.Model):
-    """Persistent password reset tokens — survives Redis restarts."""
-
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reset_tokens")
     token = models.CharField(max_length=64, unique=True, db_index=True)
     expires_at = models.DateTimeField()

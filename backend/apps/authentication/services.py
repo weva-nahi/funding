@@ -20,12 +20,40 @@ logger = logging.getLogger(__name__)
 
 
 def register_user(*, email: str, password: str, role: str = "client", **kwargs) -> User:
-    if User.objects.filter(email__iexact=email).exists():
-        raise ApplicationError("An account with this email already exists.")
+    """Register a new user or re-send verification for an unverified account.
 
-    language = kwargs.get("language") or kwargs.get("preferred_language") or "fr"
-    if language not in ("fr", "en", "ar"):
-        language = "fr"
+    If an account with this email already exists AND is verified, raise an error.
+    If it exists but is unverified, allow re-registration: invalidate old tokens
+    and issue a new verification email. This prevents email addresses from being
+    permanently blocked by sign-ups with wrong/inaccessible emails.
+    """
+    existing = User.objects.filter(email__iexact=email).first()
+
+    if existing:
+        if existing.is_email_verified:
+            raise ApplicationError("An account with this email already exists.")
+        # Unverified account — invalidate old tokens and re-send
+        EmailVerificationToken.objects.filter(user=existing, used=False).update(used=True)
+        # Update password in case they want to use a new one
+        existing.set_password(password)
+        existing.save(update_fields=["password"])
+        # Update profile fields if provided
+        if hasattr(existing, "profile"):
+            profile = existing.profile
+            for field in ["first_name", "last_name", "company", "phone", "sector"]:
+                val = kwargs.get(field) or kwargs.get("company_name" if field == "company" else field, "")
+                if val:
+                    setattr(profile, field, val)
+            profile.save()
+        token = _generate_verification_token(existing)
+        verify_url = f"{settings.FRONTEND_URL}/verify-email/{token}"
+        logger.warning(
+            "\n" + "=" * 60 + "\n"
+            "EMAIL VERIFICATION LINK FOR: %s\n%s\n" + "=" * 60,
+            email, verify_url,
+        )
+        send_verification_email.delay(existing.id, token)
+        return existing
 
     with transaction.atomic():
         user = User.objects.create_user(email=email, password=password, role=role)
@@ -36,7 +64,7 @@ def register_user(*, email: str, password: str, role: str = "client", **kwargs) 
             company=kwargs.get("company_name", ""),
             phone=kwargs.get("phone", ""),
             sector=kwargs.get("sector", ""),
-            preferred_language=language,
+            preferred_language="en",  # Always English for emails
         )
 
     org_name = kwargs.get("company_name") or kwargs.get("organization_name")
@@ -60,8 +88,7 @@ def register_user(*, email: str, password: str, role: str = "client", **kwargs) 
     logger.warning(
         "\n" + "=" * 60 + "\n"
         "EMAIL VERIFICATION LINK FOR: %s\n%s\n" + "=" * 60,
-        email,
-        verify_url,
+        email, verify_url,
     )
 
     send_verification_email.delay(user.id, token)
@@ -69,8 +96,7 @@ def register_user(*, email: str, password: str, role: str = "client", **kwargs) 
 
 
 def resend_verification_email(*, email: str) -> None:
-    """Re-issue a verification email. Silently no-ops on unknown/verified
-    accounts to avoid leaking whether an email is registered."""
+    """Re-issue a verification email for an unverified account."""
     try:
         user = User.objects.get(email__iexact=email, is_active=True)
     except User.DoesNotExist:
@@ -79,6 +105,7 @@ def resend_verification_email(*, email: str) -> None:
     if user.is_email_verified:
         return
 
+    # Invalidate all existing unused tokens
     EmailVerificationToken.objects.filter(user=user, used=False).update(used=True)
 
     token = _generate_verification_token(user)
@@ -87,22 +114,13 @@ def resend_verification_email(*, email: str) -> None:
     logger.warning(
         "\n" + "=" * 60 + "\n"
         "RESENT EMAIL VERIFICATION LINK FOR: %s\n%s\n" + "=" * 60,
-        email,
-        verify_url,
+        email, verify_url,
     )
 
     send_verification_email.delay(user.id, token)
 
 
 def unsubscribe_user(*, token: str) -> bool:
-    """Flip notify_email_enabled off for the user encoded in the token.
-
-    Returns True if a matching, still-existing user was found and updated,
-    False if the token was invalid (already-expired/malformed) or the
-    account no longer exists — callers should show a generic "link invalid"
-    message in the False case rather than anything more specific, to avoid
-    leaking account-existence information.
-    """
     user_id = resolve_unsubscribe_token(token)
     if user_id is None:
         return False
@@ -150,7 +168,7 @@ def login_user(*, email: str, password: str) -> dict:
     try:
         user = User.objects.get(email__iexact=email)
     except User.DoesNotExist:
-        raise ApplicationError("Invalid email or password.")
+        raise ApplicationError("No account found with this email address.")
 
     if user.locked_until and user.locked_until > timezone.now():
         remaining = (user.locked_until - timezone.now()).seconds // 60 + 1
@@ -161,15 +179,13 @@ def login_user(*, email: str, password: str) -> dict:
         raise ApplicationError("Invalid email or password.")
 
     if not user.is_active:
-        raise ApplicationError("Your account has been deactivated.")
+        raise ApplicationError("Your account has been deactivated. Please contact support.")
 
     if not user.is_email_verified:
-        if settings.DEBUG:
-            raise ApplicationError(
-                "Email not verified. Run: docker compose logs backend "
-                "and look for your verification link."
-            )
-        raise ApplicationError("Please verify your email before logging in.")
+        raise ApplicationError(
+            "Please verify your email before logging in. "
+            "Check your inbox or request a new verification link."
+        )
 
     if user.failed_login_attempts > 0:
         user.failed_login_attempts = 0
@@ -192,21 +208,24 @@ def login_user(*, email: str, password: str) -> dict:
 
 
 def request_password_reset(*, email: str) -> None:
+    """Send a password reset email. Unlike the old version, this explicitly
+    tells the caller whether the account exists (via the exception) so the
+    frontend can show a meaningful message."""
     try:
         user = User.objects.get(email__iexact=email, is_active=True)
-        token = _generate_reset_token(user)
-        reset_url = f"{settings.FRONTEND_URL}/reset-password/{token}"
-
-        logger.warning(
-            "\n" + "=" * 60 + "\n"
-            "PASSWORD RESET LINK FOR: %s\n%s\n" + "=" * 60,
-            email,
-            reset_url,
-        )
-
-        send_reset_password_email.delay(user.id, token)
     except User.DoesNotExist:
-        pass
+        raise ApplicationError("No account found with this email address.")
+
+    token = _generate_reset_token(user)
+    reset_url = f"{settings.FRONTEND_URL}/reset-password/{token}"
+
+    logger.warning(
+        "\n" + "=" * 60 + "\n"
+        "PASSWORD RESET LINK FOR: %s\n%s\n" + "=" * 60,
+        email, reset_url,
+    )
+
+    send_reset_password_email.delay(user.id, token)
 
 
 def reset_password(*, token: str, new_password: str) -> None:
@@ -250,7 +269,6 @@ def update_profile(*, user: User, **kwargs) -> Profile:
         "company",
         "phone",
         "sector",
-        "preferred_language",
         "notify_application_status",
         "notify_new_opportunities",
         "notify_consulting_response",
@@ -264,6 +282,11 @@ def update_profile(*, user: User, **kwargs) -> Profile:
             setattr(profile, field, value)
     profile.save()
     return profile
+
+
+def verify_admin_password(*, user: User, password: str) -> bool:
+    """Verify admin password for high-stakes actions."""
+    return user.check_password(password)
 
 
 def _handle_failed_login(user: User) -> None:

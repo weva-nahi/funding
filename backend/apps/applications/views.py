@@ -1,5 +1,6 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
+from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -14,6 +15,8 @@ from .serializers import (
     ApplicationCreateSerializer,
     ApplicationDetailSerializer,
     ApplicationListSerializer,
+    ApplicationMessageCreateSerializer,
+    ApplicationMessageSerializer,
     ApplicationReviewSerializer,
     ApplicationUpdateSerializer,
     BulkShortlistSerializer,
@@ -40,7 +43,12 @@ class ClientApplicationListView(APIView):
         serializer = ApplicationCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         opportunity = get_opportunity_by_id(opportunity_id=serializer.validated_data["opportunity_id"])
-        app = services.create_draft(user=request.user, opportunity=opportunity)
+        motivation_letter = serializer.validated_data.get("motivation_letter", "")
+        app = services.create_application(
+            user=request.user,
+            opportunity=opportunity,
+            motivation_letter=motivation_letter,
+        )
         return Response(ApplicationDetailSerializer(app).data, status=status.HTTP_201_CREATED)
 
 
@@ -61,36 +69,40 @@ class ClientApplicationDetailView(APIView):
             raise NotFoundError()
         serializer = ApplicationUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        app = services.update_draft(application=app, **serializer.validated_data)
+        app = services.update_application(application=app, **serializer.validated_data)
         return Response(ApplicationDetailSerializer(app).data)
 
 
-class SubmitApplicationView(APIView):
+class ApplicationMessageView(APIView):
+    """Chat messages on an application."""
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser]
 
-    @extend_schema(tags=["Applications"])
+    @extend_schema(responses={200: ApplicationMessageSerializer(many=True)}, tags=["Applications"])
+    def get(self, request, pk):
+        app = selectors.get_application_by_id(application_id=pk)
+        if app.user != request.user and request.user.role != "admin":
+            raise NotFoundError()
+        messages = app.messages.all()
+        return Response(ApplicationMessageSerializer(messages, many=True).data)
+
+    @extend_schema(request=ApplicationMessageCreateSerializer, tags=["Applications"])
     def post(self, request, pk):
         app = selectors.get_application_by_id(application_id=pk)
-        if app.user != request.user:
+        if app.user != request.user and request.user.role != "admin":
             raise NotFoundError()
-        app = services.submit_application(application=app, user=request.user)
-        return Response(ApplicationDetailSerializer(app).data)
-
-
-class WithdrawApplicationView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    @extend_schema(tags=["Applications"])
-    def post(self, request, pk):
-        app = selectors.get_application_by_id(application_id=pk)
-        if app.user != request.user:
-            raise NotFoundError()
-        app = services.withdraw_application(application=app, user=request.user)
-        return Response(ApplicationDetailSerializer(app).data)
+        content = request.data.get("content", "")
+        attachment = request.FILES.get("attachment")
+        msg = services.add_message(
+            application=app,
+            sender=request.user,
+            content=content,
+            attachment=attachment,
+        )
+        return Response(ApplicationMessageSerializer(msg).data, status=status.HTTP_201_CREATED)
 
 
 # ─── Admin Views ───
-
 
 class AdminApplicationListView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
@@ -107,10 +119,6 @@ class AdminApplicationListView(APIView):
 
 
 class AdminShortlistView(APIView):
-    """Dedicated view of the shortlist pool — separates 'still deciding'
-    from the raw pending queue so admins have a clear working set when
-    comparing finalists before picking a winner."""
-
     permission_classes = [IsAuthenticated, IsAdmin]
 
     @extend_schema(responses={200: ApplicationListSerializer(many=True)}, tags=["Applications"])
@@ -168,8 +176,6 @@ class ReviewApplicationView(APIView):
                 admin_user=request.user,
                 reason=serializer.validated_data.get("reason", ""),
             )
-        elif action == "in_review":
-            app = services.set_in_review(application=app, admin_user=request.user)
         elif action == "shortlist":
             app = services.shortlist_application(
                 application=app,

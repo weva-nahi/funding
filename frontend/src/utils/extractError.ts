@@ -1,41 +1,28 @@
-/**
- * extractError — normalises API error responses into a single human-readable string.
- *
- * Handles:
- *   { error: { message: "..." } }          — our custom exception handler
- *   { field: ["message"] }                  — DRF field-level validation errors
- *   { detail: "..." }                       — DRF default 401/403/404 format
- *   plain strings
- */
-export function extractError(err: unknown, fallback = "Something went wrong."): string {
+export function extractError(err: unknown, fallback = 'Something went wrong.'): string {
   const ax = err as { response?: { data?: unknown } }
   const data = ax?.response?.data
 
   if (!data) return fallback
+  if (typeof data === 'string') return data
 
-  if (typeof data === "string") return data
-
-  if (typeof data === "object" && data !== null) {
+  if (typeof data === 'object' && data !== null) {
     const d = data as Record<string, unknown>
 
-    // Our custom exception format: { error: { message: "..." } }
-    if (typeof d.error === "object" && d.error !== null) {
+    if (typeof d.error === 'object' && d.error !== null) {
       const e = d.error as Record<string, unknown>
-      if (typeof e.message === "string" && e.message) return e.message
+      if (typeof e.message === 'string' && e.message) return e.message
     }
 
-    // DRF plain detail string
-    if (typeof d.detail === "string" && d.detail) return d.detail
+    if (typeof d.detail === 'string' && d.detail) return d.detail
 
-    // DRF field-level errors: { field: ["message1", ...] } or { field: "message" }
-    const keys = Object.keys(d).filter((k) => k !== "success")
+    const keys = Object.keys(d).filter((k) => k !== 'success')
     for (const key of keys) {
       const val = d[key]
-      if (Array.isArray(val) && val.length > 0 && typeof val[0] === "string") {
-        return `${key !== "non_field_errors" ? key + ": " : ""}${val[0]}`
+      if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'string') {
+        return `${key !== 'non_field_errors' ? key + ': ' : ''}${val[0]}`
       }
-      if (typeof val === "string" && val) {
-        return `${key !== "non_field_errors" ? key + ": " : ""}${val}`
+      if (typeof val === 'string' && val) {
+        return `${key !== 'non_field_errors' ? key + ': ' : ''}${val}`
       }
     }
   }

@@ -2,28 +2,60 @@ import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/axios'
 import { DownloadCloud, BarChart3 } from 'lucide-react'
 import {
-  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
-  PieChart, Pie, Cell, BarChart, Bar, Legend,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  Legend,
 } from 'recharts'
 
-interface ActivityPoint { day: string; count: number }
-interface StatusSlice { status: string; count: number }
-interface SourceRow { source: string; count: number }
+interface ActivityPoint {
+  day: string
+  count: number
+}
+interface StatusSlice {
+  status: string
+  count: number
+}
+interface SourceRow {
+  source: string
+  count: number
+}
 
-const COLORS = ['#0f766e', '#14b8a6', '#5eead4', '#f59e0b', '#ef4444', '#6366f1', '#8b5cf6']
+const COLORS = [
+  '#0f766e',
+  '#14b8a6',
+  '#5eead4',
+  '#f59e0b',
+  '#ef4444',
+  '#6366f1',
+  '#8b5cf6',
+]
 
 export function AnalyticsPage() {
   const { data: activity, isLoading: aLoading } = useQuery<ActivityPoint[]>({
     queryKey: ['analytics-activity'],
-    queryFn: () => api.get('/analytics/activity/', { params: { days: 30 } }).then(r => r.data),
+    queryFn: () =>
+      api
+        .get('/analytics/activity/', { params: { days: 30 } })
+        .then((r) => r.data),
   })
   const { data: distribution } = useQuery<StatusSlice[]>({
     queryKey: ['analytics-status'],
-    queryFn: () => api.get('/analytics/status-distribution/').then(r => r.data),
+    queryFn: () =>
+      api.get('/analytics/status-distribution/').then((r) => r.data),
   })
   const { data: sources } = useQuery<SourceRow[]>({
     queryKey: ['analytics-sources'],
-    queryFn: () => api.get('/analytics/top-sources/').then(r => r.data),
+    queryFn: () => api.get('/analytics/top-sources/').then((r) => r.data),
   })
 
   const handleExport = async () => {
@@ -40,10 +72,17 @@ export function AnalyticsPage() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Full Analytics</h1>
-          <p className="text-muted-foreground mt-1">Platform metrics and data visualization</p>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Full Analytics
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Platform metrics and data visualization
+          </p>
         </div>
-        <button onClick={handleExport} className="inline-flex items-center gap-2 rounded-lg bg-white border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors">
+        <button
+          onClick={handleExport}
+          className="inline-flex items-center gap-2 rounded-lg bg-white border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+        >
           <DownloadCloud className="h-4 w-4" /> Export CSV
         </button>
       </div>
@@ -51,7 +90,9 @@ export function AnalyticsPage() {
       <div className="rounded-xl border bg-white p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-4 border-b pb-4">
           <BarChart3 className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Applications Over Time (30 days)</h2>
+          <h2 className="text-lg font-semibold">
+            Applications Over Time (30 days)
+          </h2>
         </div>
         {aLoading ? (
           <div className="h-64 rounded-lg bg-muted animate-pulse" />
@@ -62,7 +103,13 @@ export function AnalyticsPage() {
               <XAxis dataKey="day" tick={{ fontSize: 11 }} />
               <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
               <Tooltip />
-              <Line type="monotone" dataKey="count" stroke="#0f766e" strokeWidth={2} dot={false} />
+              <Line
+                type="monotone"
+                dataKey="count"
+                stroke="#0f766e"
+                strokeWidth={2}
+                dot={false}
+              />
             </LineChart>
           </ResponsiveContainer>
         )}
@@ -70,11 +117,23 @@ export function AnalyticsPage() {
 
       <div className="grid sm:grid-cols-2 gap-6">
         <div className="rounded-xl border bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold mb-4 border-b pb-4">Status Distribution</h2>
+          <h2 className="text-lg font-semibold mb-4 border-b pb-4">
+            Status Distribution
+          </h2>
           <ResponsiveContainer width="100%" height={240}>
             <PieChart>
-              <Pie data={distribution ?? []} dataKey="count" nameKey="status" cx="50%" cy="50%" outerRadius={90} label>
-                {(distribution ?? []).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+              <Pie
+                data={distribution ?? []}
+                dataKey="count"
+                nameKey="status"
+                cx="50%"
+                cy="50%"
+                outerRadius={90}
+                label
+              >
+                {(distribution ?? []).map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
               </Pie>
               <Tooltip />
               <Legend />
@@ -82,7 +141,9 @@ export function AnalyticsPage() {
           </ResponsiveContainer>
         </div>
         <div className="rounded-xl border bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold mb-4 border-b pb-4">Top Funding Sources</h2>
+          <h2 className="text-lg font-semibold mb-4 border-b pb-4">
+            Top Funding Sources
+          </h2>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={sources ?? []}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />

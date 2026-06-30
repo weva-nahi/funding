@@ -1,15 +1,18 @@
-"""Opportunity selectors — read-only queries with full-text search."""
+"""Opportunity selectors."""
 
 from decimal import Decimal, InvalidOperation
 
+from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 
 from .models import FundingOpportunity, SavedOpportunity
 
+# Funding types compatible with Islamic finance (no riba/interest)
+ISLAMIC_FINANCE_TYPES = getattr(settings, "ISLAMIC_FINANCE_ALLOWED_TYPES", ["grant", "concessional", "blended"])
+
 
 def _to_decimal(value):
-    """Safely coerce a raw query-string value to Decimal, or None if invalid."""
     if value in (None, ""):
         return None
     try:
@@ -24,6 +27,7 @@ def get_published_opportunities(
     source=None,
     country=None,
     city=None,
+    wilaya=None,
     amount_min=None,
     amount_max=None,
     funding_type=None,
@@ -31,23 +35,28 @@ def get_published_opportunities(
     min_completeness=None,
     has_deadline=None,
 ):
-    """Published, non-expired opportunities only. select_related("created_by")
-    covers the N+1 risk on that field across list pagination."""
+    """Published opportunities — Islamic finance only, active deadlines or no deadline."""
     today = timezone.now().date()
+    
     qs = (
         FundingOpportunity.objects.filter(status="published")
-        .filter(Q(deadline__isnull=True) | Q(deadline__gte=today))
+        .filter(
+            Q(deadline__isnull=True) | Q(deadline__gte=today)
+        )  # No deadline OR future deadline
+        .filter(funding_type__in=ISLAMIC_FINANCE_TYPES)  # Islamic finance only
         .select_related("created_by")
     )
 
     if search:
         qs = qs.filter(Q(title__icontains=search) | Q(description__icontains=search))
     if source:
-        qs = qs.filter(source=source)
+        qs = qs.filter(source__icontains=source)
     if country:
         qs = qs.filter(country__icontains=country)
-    if city:
-        qs = qs.filter(city__icontains=city)
+    # Support both city and wilaya params
+    location = wilaya or city
+    if location:
+        qs = qs.filter(city__icontains=location)
 
     amount_min_dec = _to_decimal(amount_min)
     if amount_min_dec is not None:
@@ -58,7 +67,8 @@ def get_published_opportunities(
         qs = qs.filter(amount__lte=amount_max_dec)
 
     if funding_type:
-        qs = qs.filter(funding_type=funding_type)
+        if funding_type in ISLAMIC_FINANCE_TYPES:
+            qs = qs.filter(funding_type=funding_type)
     if sector:
         qs = qs.filter(sector__icontains=sector)
     if min_completeness:
@@ -66,15 +76,14 @@ def get_published_opportunities(
             qs = qs.filter(completeness_score__gte=int(min_completeness))
         except (TypeError, ValueError):
             pass
-
-    if has_deadline is not None and str(has_deadline).lower() in ("1", "true", "yes", "on"):
-        qs = qs.filter(deadline__isnull=False)
+    if has_deadline and has_deadline != 'false':
+        qs = qs.filter(deadline__isnull=False, deadline__gte=today)
 
     return qs.order_by("-created_at")
 
 
 def get_all_opportunities(*, status_filter=None, search=None):
-    """Admin-facing — intentionally includes expired/draft/archived rows."""
+    """Admin-facing — includes all rows."""
     qs = FundingOpportunity.objects.select_related("created_by").all()
     if status_filter:
         qs = qs.filter(status=status_filter)
@@ -92,6 +101,7 @@ def get_latest_opportunities(*, limit: int = 5):
     return (
         FundingOpportunity.objects.filter(status="published")
         .filter(Q(deadline__isnull=True) | Q(deadline__gte=today))
+        .filter(funding_type__in=ISLAMIC_FINANCE_TYPES)
         .order_by("-created_at")[:limit]
     )
 
@@ -101,21 +111,12 @@ def get_opportunity_count():
     return (
         FundingOpportunity.objects.filter(status="published")
         .filter(Q(deadline__isnull=True) | Q(deadline__gte=today))
+        .filter(funding_type__in=ISLAMIC_FINANCE_TYPES)
         .count()
     )
 
 
-# ─── Saved opportunities (save-for-later) ─────────────────────────────────────
-
 def get_saved_opportunities(*, user):
-    """Return the user's saved opportunities (published or not), newest first.
-
-    select_related("created_by") closes the same N+1 gap on this path —
-    previously only the published/admin list selectors had it, but this
-    one (backing /opportunities/saved/) was overlooked and would have
-    triggered one extra query per row whenever created_by_email or similar
-    fields are read from the serialized opportunity.
-    """
     return (
         FundingOpportunity.objects.filter(saves__user=user)
         .select_related("created_by")
@@ -125,21 +126,12 @@ def get_saved_opportunities(*, user):
 
 
 def get_saved_opportunity_ids(*, user) -> set:
-    """Return a set of opportunity ids the user has saved (for quick lookup).
-    This single query is what makes the get_is_saved() N+1 fix possible —
-    call it ONCE per request and pass the resulting set through serializer
-    context, rather than letting each serialized row re-query."""
     return set(
         SavedOpportunity.objects.filter(user=user).values_list("opportunity_id", flat=True)
     )
 
 
 def is_opportunity_saved(*, user, opportunity_id: int) -> bool:
-    """Single-object check — used only as a fallback in
-    FundingOpportunitySerializer.get_is_saved() for the single-object
-    detail view (OpportunityDetailView), where there's exactly one row
-    being serialized and so no N+1 risk exists; list views should always
-    pass saved_ids through context instead of relying on this fallback."""
     return SavedOpportunity.objects.filter(user=user, opportunity_id=opportunity_id).exists()
 
 

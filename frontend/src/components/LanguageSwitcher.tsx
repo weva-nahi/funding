@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, Globe2 } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 
 const LANGUAGES = [
   { code: 'fr', label: 'Français', flag: '🇫🇷' },
@@ -12,7 +12,9 @@ export function LanguageSwitcher() {
   const { i18n } = useTranslation()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-  const current = LANGUAGES.find((l) => l.code === i18n.language?.slice(0, 2)) ?? LANGUAGES[0]
+  const currentIndex = LANGUAGES.findIndex(l => l.code === i18n.language?.slice(0, 2))
+  const idx = currentIndex === -1 ? 0 : currentIndex
+  const current = LANGUAGES[idx]
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -24,34 +26,36 @@ export function LanguageSwitcher() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const select = (code: string) => {
-    i18n.changeLanguage(code)
-    setOpen(false)
-  }
-
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
-        aria-label="Change language"
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-medium hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
+        aria-label={`Language: ${current.label}`}
       >
-        <Globe2 className="h-3.5 w-3.5 text-muted-foreground" />
-        <span>{current.flag}</span>
-        <span className="hidden sm:inline">{current.label}</span>
+        <span className="text-base leading-none">{current.flag}</span>
+        <span className="hidden sm:inline text-sm">{current.label}</span>
+        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
-        <div className="absolute end-0 top-full mt-2 w-44 rounded-xl border bg-white shadow-lg overflow-hidden z-50 animate-fade-in">
-          {LANGUAGES.map((lang) => (
+        <div className="absolute end-0 top-full mt-2 w-44 rounded-xl border bg-white shadow-xl overflow-hidden z-50 animate-fade-in">
+          {LANGUAGES.map(lang => (
             <button
               key={lang.code}
-              onClick={() => select(lang.code)}
-              className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-muted transition-colors"
+              onClick={() => {
+                i18n.changeLanguage(lang.code)
+                setOpen(false)
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-muted transition-colors text-left ${
+                lang.code === current.code ? 'bg-primary/5 text-primary font-medium' : 'text-foreground'
+              }`}
             >
               <span className="text-base">{lang.flag}</span>
-              <span className="flex-1 text-start">{lang.label}</span>
-              {current.code === lang.code && <Check className="h-3.5 w-3.5 text-primary" />}
+              <span>{lang.label}</span>
+              {lang.code === current.code && (
+                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
+              )}
             </button>
           ))}
         </div>

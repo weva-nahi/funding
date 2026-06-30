@@ -10,6 +10,7 @@ class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
     password_confirm = serializers.CharField(write_only=True)
+    company_name = serializers.CharField(required=False, allow_blank=True, max_length=60)
 
     def validate_password(self, value):
         validate_password(value)
@@ -39,6 +40,10 @@ class UnsubscribeSerializer(serializers.Serializer):
     token = serializers.CharField()
 
 
+class VerifyAdminPasswordSerializer(serializers.Serializer):
+    password = serializers.CharField(write_only=True)
+
+
 class ProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source="user.email", read_only=True)
     role = serializers.CharField(source="user.role", read_only=True)
@@ -55,7 +60,6 @@ class ProfileSerializer(serializers.ModelSerializer):
             "phone",
             "avatar",
             "sector",
-            "preferred_language",
             "notify_application_status",
             "notify_new_opportunities",
             "notify_consulting_response",

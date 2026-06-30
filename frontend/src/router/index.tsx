@@ -10,6 +10,7 @@ import { HomePage } from '@/pages/public/HomePage'
 
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { RegisterPage } from '@/pages/auth/RegisterPage'
+import { CheckEmailPage } from '@/pages/auth/CheckEmailPage'
 import { VerifyEmailPage } from '@/pages/auth/VerifyEmailPage'
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
 import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
@@ -22,21 +23,21 @@ import { NewApplicationPage } from '@/pages/client/NewApplicationPage'
 import { MyApplicationsPage } from '@/pages/client/MyApplicationsPage'
 import { ApplicationDetailPage } from '@/pages/client/ApplicationDetailPage'
 import { NotificationsPage } from '@/pages/client/NotificationsPage'
-import { NotificationSettingsPage } from '@/pages/client/NotificationSettingsPage'
 import { ConsultingPage } from '@/pages/client/ConsultingPage'
 import { ProfilePage } from '@/pages/client/ProfilePage'
 
 import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage'
 import { ApplicationsReviewPage } from '@/pages/admin/ApplicationsReviewPage'
-import { AdminOpportunitiesPage } from '@/pages/admin/OpportunitiesPage'
+import { ApplicationDetailAdminPage } from '@/pages/admin/ApplicationDetailAdminPage'
+import { AdminOpportunitiesPage } from '@/pages/admin/AdminOpportunitiesPage'
 import { OpportunityFormPage } from '@/pages/admin/OpportunityFormPage'
 import { ExcelImportPage } from '@/pages/admin/ExcelImportPage'
 import { ScrapingDashboardPage } from '@/pages/admin/ScrapingDashboardPage'
-import { ScrapingAlertsPage } from '@/pages/admin/ScrapingAlertsPage'
 import { ConsultingRequestsPage } from '@/pages/admin/ConsultingRequestsPage'
 import { UsersPage } from '@/pages/admin/UsersPage'
 import { AnalyticsPage } from '@/pages/admin/AnalyticsPage'
 import { AuditLogsPage } from '@/pages/admin/AuditLogsPage'
+import { AdminProfilePage } from '@/pages/admin/AdminProfilePage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
 export function AppRouter() {
@@ -48,6 +49,7 @@ export function AppRouter() {
 
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/verify-email-sent" element={<CheckEmailPage />} />
       <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
@@ -63,25 +65,24 @@ export function AppRouter() {
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/consulting" element={<ConsultingPage />} />
         <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/profile/notifications" element={<NotificationSettingsPage />} />
       </Route>
 
       <Route element={<ProtectedRoute><AdminRoute><AdminLayout /></AdminRoute></ProtectedRoute>}>
         <Route path="/admin" element={<AdminDashboardPage />} />
         <Route path="/admin/applications" element={<ApplicationsReviewPage />} />
+        <Route path="/admin/applications/:id" element={<ApplicationDetailAdminPage />} />
         <Route path="/admin/opportunities" element={<AdminOpportunitiesPage />} />
         <Route path="/admin/opportunities/new" element={<OpportunityFormPage />} />
         <Route path="/admin/opportunities/:id/edit" element={<OpportunityFormPage />} />
         <Route path="/admin/excel-import" element={<ExcelImportPage />} />
         <Route path="/admin/scraping" element={<ScrapingDashboardPage />} />
-        <Route path="/admin/scraping/alerts" element={<ScrapingAlertsPage />} />
         <Route path="/admin/consulting" element={<ConsultingRequestsPage />} />
         <Route path="/admin/users" element={<UsersPage />} />
         <Route path="/admin/analytics" element={<AnalyticsPage />} />
         <Route path="/admin/audit" element={<AuditLogsPage />} />
+        <Route path="/admin/profile" element={<AdminProfilePage />} />
       </Route>
 
-      {/* 404 catch-all — must be last */}
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )

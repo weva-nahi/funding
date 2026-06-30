@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Save, CheckCircle, Bell, Mail } from 'lucide-react'
 import api from '@/lib/axios'
@@ -14,34 +15,6 @@ interface NotificationPrefs {
   notify_email_enabled: boolean
   notify_frequency: 'immediate' | 'daily'
 }
-
-const TOGGLE_FIELDS: { key: keyof NotificationPrefs; label: string; description: string }[] = [
-  {
-    key: 'notify_application_status',
-    label: 'Application status changes',
-    description: 'When an application you submitted is reviewed, approved, or rejected.',
-  },
-  {
-    key: 'notify_new_opportunities',
-    label: 'New funding opportunities',
-    description: 'When a new opportunity matching your interests is published.',
-  },
-  {
-    key: 'notify_consulting_response',
-    label: 'Consulting responses',
-    description: 'When the Richat team responds to a consulting request you submitted.',
-  },
-  {
-    key: 'notify_deadline_reminder',
-    label: 'Deadline reminders',
-    description: 'Reminders 7 days and 1 day before an application deadline.',
-  },
-  {
-    key: 'notify_system_announcements',
-    label: 'System announcements',
-    description: 'Important platform updates and announcements.',
-  },
-]
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -64,6 +37,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 }
 
 export function NotificationSettingsPage() {
+  const { t } = useTranslation()
   const { user, setUser } = useAuthStore()
   const queryClient = useQueryClient()
   const [prefs, setPrefs] = useState<NotificationPrefs>({
@@ -76,6 +50,34 @@ export function NotificationSettingsPage() {
     notify_frequency: 'immediate',
   })
   const [saved, setSaved] = useState(false)
+
+  const TOGGLE_FIELDS: { key: keyof NotificationPrefs; label: string; description: string }[] = [
+    {
+      key: 'notify_application_status',
+      label: t('notifications.appStatusChanges'),
+      description: t('notifications.appStatusChangesDesc'),
+    },
+    {
+      key: 'notify_new_opportunities',
+      label: t('notifications.newOpportunities'),
+      description: t('notifications.newOpportunitiesDesc'),
+    },
+    {
+      key: 'notify_consulting_response',
+      label: t('notifications.consultingResponses'),
+      description: t('notifications.consultingResponsesDesc'),
+    },
+    {
+      key: 'notify_deadline_reminder',
+      label: t('notifications.deadlineReminders'),
+      description: t('notifications.deadlineRemindersDesc'),
+    },
+    {
+      key: 'notify_system_announcements',
+      label: t('notifications.systemAnnouncements'),
+      description: t('notifications.systemAnnouncementsDesc'),
+    },
+  ]
 
   useEffect(() => {
     if (user?.profile) {
@@ -113,14 +115,14 @@ export function NotificationSettingsPage() {
   return (
     <div className="max-w-2xl space-y-6 animate-fade-in">
       <Link to="/profile" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" /> Back to Profile
+        <ArrowLeft className="h-4 w-4 rtl:rotate-180" /> {t('notifications.backToProfile')}
       </Link>
 
       <div>
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <Bell className="h-6 w-6 text-primary" /> Notification Settings
+          <Bell className="h-6 w-6 text-primary" /> {t('notifications.settings')}
         </h1>
-        <p className="text-muted-foreground mt-1">Choose what you want to be notified about, and how.</p>
+        <p className="text-muted-foreground mt-1">{t('notifications.chooseWhat')}</p>
       </div>
 
       <div className="rounded-xl border bg-white p-6 shadow-sm space-y-1 divide-y">
@@ -138,20 +140,20 @@ export function NotificationSettingsPage() {
       <div className="rounded-xl border bg-white p-6 shadow-sm space-y-4">
         <div className="flex items-center gap-2.5 pb-2">
           <Mail className="h-5 w-5 text-primary" />
-          <h2 className="font-semibold">Delivery</h2>
+          <h2 className="font-semibold">{t('notifications.delivery')}</h2>
         </div>
 
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-medium">Email notifications</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Master switch — turn off to stop all notification emails.</p>
+            <p className="text-sm font-medium">{t('notifications.emailNotifications')}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{t('notifications.masterSwitch')}</p>
           </div>
           <Toggle checked={prefs.notify_email_enabled} onChange={setToggle('notify_email_enabled')} />
         </div>
 
         {prefs.notify_email_enabled && (
           <div className="pt-2 border-t">
-            <p className="text-sm font-medium mb-2">Frequency</p>
+            <p className="text-sm font-medium mb-2">{t('notifications.frequency')}</p>
             <div className="flex gap-4">
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
@@ -160,7 +162,7 @@ export function NotificationSettingsPage() {
                   checked={prefs.notify_frequency === 'immediate'}
                   onChange={() => setFrequency('immediate')}
                 />
-                Immediate
+                {t('notifications.immediate')}
               </label>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
@@ -169,7 +171,7 @@ export function NotificationSettingsPage() {
                   checked={prefs.notify_frequency === 'daily'}
                   onChange={() => setFrequency('daily')}
                 />
-                Daily digest
+                {t('notifications.dailyDigest')}
               </label>
             </div>
           </div>
@@ -180,11 +182,11 @@ export function NotificationSettingsPage() {
         <button onClick={() => save.mutate()} disabled={save.isPending}
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50">
           <Save className="h-4 w-4" />
-          {save.isPending ? 'Saving...' : 'Save Preferences'}
+          {save.isPending ? t('profile.saving') : t('notifications.savePreferences')}
         </button>
         {saved && (
           <span className="inline-flex items-center gap-1 text-sm text-emerald-600">
-            <CheckCircle className="h-4 w-4" /> Saved!
+            <CheckCircle className="h-4 w-4" /> {t('notifications.saved')}
           </span>
         )}
       </div>

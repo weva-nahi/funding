@@ -1,29 +1,14 @@
-"""Funding Opportunity models."""
-
 from django.conf import settings
 from django.db import models
-
 from common.mixins import TimestampMixin
 
 
 class FundingOpportunity(TimestampMixin):
-    """A climate funding opportunity from an international source.
-
-    Restricted to Mauritania: scrapers only ingest Mauritania-targeted
-    projects (see apps.scraping.services), so `country` is expected to
-    always resolve to Mauritania for scraped rows, and `city` captures the
-    specific Mauritanian locality the project targets when the source data
-    allows it to be parsed out (e.g. "Nouakchott", "Nouadhibou", "Rosso").
-    """
-
     SOURCE_CHOICES = [
         ("GEF", "Global Environment Facility"),
         ("GCF", "Green Climate Fund"),
         ("OECD", "OECD"),
-        ("CLIMATE_FUND", "Climate Fund"),
         ("WORLD_BANK", "World Bank"),
-        ("AFD", "Agence Française de Développement"),
-        ("EU", "European Union"),
     ]
 
     STATUS_CHOICES = [
@@ -72,13 +57,10 @@ class FundingOpportunity(TimestampMixin):
     @property
     def is_expired(self):
         from common.utils.dates import is_deadline_passed
-
         return is_deadline_passed(self.deadline)
 
 
 class SavedOpportunity(TimestampMixin):
-    """A user's bookmarked opportunity ('Sauvegarder pour plus tard')."""
-
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

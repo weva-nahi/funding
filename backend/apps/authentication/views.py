@@ -1,4 +1,4 @@
-"""Authentication views — thin controllers calling services/selectors."""
+"""Authentication views."""
 
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -22,6 +22,7 @@ from .serializers import (
     TokenSerializer,
     UnsubscribeSerializer,
     UserSerializer,
+    VerifyAdminPasswordSerializer,
 )
 
 
@@ -34,9 +35,13 @@ class RegisterView(APIView):
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        services.register_user(**serializer.validated_data)
+        user = services.register_user(**serializer.validated_data)
         return Response(
-            {"success": True, "message": "Registration successful. Please verify your email."},
+            {
+                "success": True,
+                "message": "Registration successful. Please check your email to verify your account.",
+                "email": user.email,
+            },
             status=status.HTTP_201_CREATED,
         )
 
@@ -159,8 +164,6 @@ class VerifyEmailView(APIView):
 
 
 class ResendVerificationEmailView(APIView):
-    """Re-send the verification email for an unverified account."""
-
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "signup"
@@ -180,15 +183,6 @@ class ResendVerificationEmailView(APIView):
 
 
 class UnsubscribeView(APIView):
-    """GDPR-compliant one-click unsubscribe — no login required.
-
-    Accepts the token via POST body (frontend page reads the :token route
-    param and posts it here) rather than GET-with-side-effects, since GET
-    requests can be pre-fetched by email-client link scanners/proxies and
-    silently trigger the unsubscribe before the user even opens the email —
-    a known issue with GET-based unsubscribe links.
-    """
-
     permission_classes = [AllowAny]
 
     @extend_schema(request=UnsubscribeSerializer, tags=["Authentication"])
@@ -214,9 +208,10 @@ class PasswordResetRequestView(APIView):
     def post(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        # This now raises ApplicationError if account not found
         services.request_password_reset(email=serializer.validated_data["email"])
         return Response(
-            {"success": True, "message": "If the email exists, a reset link has been sent."},
+            {"success": True, "message": "A password reset link has been sent to your email."},
             status=status.HTTP_200_OK,
         )
 
@@ -254,6 +249,26 @@ class ChangePasswordView(APIView):
         )
 
 
+class VerifyAdminPasswordView(APIView):
+    """Verify admin password for high-stakes actions."""
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    @extend_schema(request=VerifyAdminPasswordSerializer, tags=["Authentication"])
+    def post(self, request):
+        serializer = VerifyAdminPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        valid = services.verify_admin_password(
+            user=request.user,
+            password=serializer.validated_data["password"],
+        )
+        if not valid:
+            return Response(
+                {"success": False, "message": "Incorrect password."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({"success": True}, status=status.HTTP_200_OK)
+
+
 class ProfileView(APIView):
     @extend_schema(responses={200: ProfileSerializer}, tags=["Authentication"])
     def get(self, request):
@@ -270,9 +285,8 @@ class ProfileView(APIView):
         avatar = request.FILES.get("avatar")
         if avatar is not None:
             from common.validators import validate_file_size, validate_file_type
-
             validate_file_size(avatar)
-            validate_file_type(avatar)  # also runs validate_image_dimensions internally
+            validate_file_type(avatar)
 
         profile = services.update_profile(user=request.user, **validated)
         if avatar is not None:
@@ -288,7 +302,8 @@ class UserListView(APIView):
     @extend_schema(responses={200: UserSerializer(many=True)}, tags=["Authentication"])
     def get(self, request):
         search = request.query_params.get("search")
-        users = selectors.get_active_users(search=search)
+        # Only show verified users in admin panel
+        users = selectors.get_verified_users(search=search)
         paginator = StandardPagination()
         page = paginator.paginate_queryset(users, request)
         return paginator.get_paginated_response(UserSerializer(page, many=True).data)
@@ -313,15 +328,13 @@ class UserDetailView(APIView):
 
     @extend_schema(tags=["Authentication"])
     def delete(self, request, user_id):
-        """Admin can delete a user account."""
+        """Admin can delete a user account. Requires password confirmation."""
         user = selectors.get_user_by_id(user_id=user_id)
         user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class MeView(APIView):
-    """Return the current authenticated user."""
-
     @extend_schema(responses={200: UserSerializer}, tags=["Authentication"])
     def get(self, request):
         return Response(UserSerializer(request.user).data)
