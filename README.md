@@ -16,18 +16,17 @@ A full-stack B2B platform helping Mauritanian businesses discover, apply for, an
 - [Email](#email)
 - [Security](#security)
 - [Testing](#testing)
-- [Production Deployment](#production-deployment)
 - [Troubleshooting](#troubleshooting)
 
 ## Architecture
 
 | Layer | Stack |
 |---|---|
-| Backend | Django 5, Django REST Framework, PostgreSQL 16, Redis 7, Celery + Celery Beat, Django Channels (WebSockets via Daphne) |
+| Backend | Django 5, Django REST Framework, MySQL 8.0, Redis 7, Celery + Celery Beat, Django Channels (WebSockets) |
 | Frontend | React 18, TypeScript, Vite, Tailwind CSS, TanStack Query, Zustand, react-i18next |
 | Background jobs | Celery workers — general queue + dedicated scraping queue |
-| Reverse proxy | Nginx (dev: Vite dev server + Django; prod: built static assets + API proxy) |
-| Orchestration | Docker Compose (`docker-compose.yml` for dev, `docker-compose.prod.yml` for prod) |
+
+This is a local-only setup: backend, frontend, database, and Redis all run as native processes on your machine — no Docker, no reverse proxy.
 
 ### Redis partitioning
 
@@ -57,9 +56,11 @@ Each partition can be moved to a separate Redis instance by updating the corresp
 
 ## Prerequisites
 
-- Docker and Docker Compose v2
-- Node.js 20+ (for local frontend dev outside Docker)
-- Python 3.11+ (for local backend dev outside Docker)
+- Python 3.11+
+- Node.js 20+
+- MySQL 8.0+ (running locally, e.g. via WAMP/XAMPP or a standalone install)
+- Redis-compatible server on Windows — [Memurai](https://www.memurai.com/) (installs as a native Windows service) or Redis inside WSL2
+- Google Chrome + a matching [ChromeDriver](https://googlechromelabs.github.io/chrome-for-testing/) (only needed to run the OECD scraper)
 
 ## Quick Start (Development)
 
@@ -67,8 +68,48 @@ Each partition can be moved to a separate Redis instance by updating the corresp
 git clone <repo-url>
 cd Richat_Funding_Tracker
 cp .env.example .env   # edit values as needed
+```
 
-docker compose up --build
+Create the MySQL database and user (adjust to your local MySQL client):
+
+```sql
+CREATE DATABASE richat_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'richat_user'@'localhost' IDENTIFIED BY 'your-database-password';
+GRANT ALL PRIVILEGES ON richat_db.* TO 'richat_user'@'localhost';
+```
+
+Make sure Memurai (or your Redis server) is running, then set up and start the backend:
+
+```bash
+cd backend
+python -m venv venv
+venv\Scripts\activate            # PowerShell: venv\Scripts\Activate.ps1
+pip install -r requirements/development.txt
+
+python manage.py migrate
+python manage.py create_demo_accounts
+python manage.py runserver
+```
+
+`runserver` serves both HTTP and WebSockets (Django Channels patches it automatically in DEBUG mode) — no separate ASGI server needed locally.
+
+In separate terminals, start the Celery worker and beat scheduler (only needed if you're testing background jobs, notifications, or scraping):
+
+```bash
+cd backend
+venv\Scripts\activate
+celery -A config worker -l info --pool=solo -Q celery,default,scraping
+celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+```
+
+`--pool=solo` is required on Windows — the default `prefork` pool relies on `billiard` multiprocessing primitives that routinely fail with `PermissionError: [WinError 5]` on Windows. `solo` runs tasks sequentially in a single process (no `--concurrency` flag needed). On Linux/macOS you can drop `--pool=solo` and use `--concurrency=N` instead.
+
+In another terminal, start the frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
 Services:
@@ -80,21 +121,19 @@ Services:
 | API docs | http://localhost:8000/api/v1/docs/ |
 | Django admin | http://localhost:8000/admin/ |
 
-**Development demo accounts** (created automatically, development only):
+**Development demo accounts** (created by `create_demo_accounts`, development only):
 
 | Role | Email | Password |
 |---|---|---|
 | Admin | admin@richat.mr | Admin1234! |
 | Client | client@richat.mr | Client1234! |
 
-These accounts do not exist in production.
-
 ## Environment Variables
 
 Copy `.env.example` to `.env` and fill in the values. Key groups:
 
-- **Django**: `SECRET_KEY` (keep secret), `DEBUG` (False in production), `ALLOWED_HOSTS`, `FRONTEND_URL`
-- **Database**: `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`
+- **Django**: `SECRET_KEY` (keep secret), `DEBUG`, `ALLOWED_HOSTS`, `FRONTEND_URL`
+- **Database**: `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_HOST`, `MYSQL_PORT`
 - **Redis**: `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND`, `CHANNEL_LAYERS_BACKEND`, `REDIS_CACHE_URL`
 - **JWT**: `ACCESS_TOKEN_LIFETIME_MINUTES`, `REFRESH_TOKEN_LIFETIME_DAYS`
 - **Email**: `EMAIL_HOST`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`
@@ -129,34 +168,27 @@ Richat_Funding_Tracker/
 │   │   ├── store/            # Zustand stores
 │   │   ├── router/           # Routes + guards
 │   │   └── locales/          # fr.json / en.json / ar.json
-├── nginx/                    # Dev and prod Nginx configs
-├── .github/workflows/        # CI and CD pipelines
-├── docker-compose.yml        # Development
-└── docker-compose.prod.yml   # Production
+└── .github/workflows/        # CI pipeline
 ```
 
 ## Common Tasks
 
 ```bash
-# View logs
-docker compose logs -f backend
-docker compose logs -f celery_scraping_worker
-
 # Run backend tests
-docker compose exec backend pytest -v
+cd backend && pytest -v
 
 # Run frontend tests
-docker compose exec frontend npm run test
+cd frontend && npm run test
 
 # Django shell
-docker compose exec backend python manage.py shell
+cd backend && python manage.py shell
 
 # Apply new migrations
-docker compose exec backend python manage.py makemigrations
-docker compose exec backend python manage.py migrate
+cd backend && python manage.py makemigrations
+cd backend && python manage.py migrate
 
 # Trigger a scraper manually
-docker compose exec backend python -c \
+cd backend && python -c \
   "from apps.scraping.tasks import run_scraping_job; run_scraping_job.delay(source='gef')"
 ```
 
@@ -183,7 +215,7 @@ All scrapers:
 - Skip duplicates silently — only new opportunities are counted and saved
 - Run until the source is exhausted
 
-Trigger from the admin Scraping page or via the API.
+Trigger from the admin Scraping page or via the API. The OECD scraper uses Selenium and needs `CHROME_BINARY_PATH`/`CHROMEDRIVER_PATH` in `.env` pointing at your local Chrome + ChromeDriver install.
 
 ## Email
 
@@ -207,42 +239,27 @@ All transactional emails render in English by default. The "Check your email" pa
 
 ```bash
 # Backend
-docker compose exec backend pytest -v --tb=short
+cd backend && pytest -v --tb=short
 
 # Frontend
-docker compose exec frontend npm run test
+cd frontend && npm run test
 
 # TypeScript check
-docker compose exec frontend npx tsc --noEmit
+cd frontend && npx tsc --noEmit
 ```
 
-CI runs on every push/PR to main/develop: lint (flake8), typecheck (tsc), backend tests (pytest), frontend tests (vitest).
-
-## Production Deployment
-
-```bash
-docker compose -f docker-compose.prod.yml build
-docker compose -f docker-compose.prod.yml up -d
-```
-
-Automated via `.github/workflows/deploy.yml` on push to main.
-
-Production requirements:
-- `DEBUG=False`
-- Strong `SECRET_KEY`
-- Valid SSL certificate in `nginx/certs/`
-- SMTP credentials for transactional email
-- S3/R2 credentials for media storage (optional — local storage works for small deployments)
+CI runs on every push/PR to main/develop: lint (flake8), typecheck (tsc), backend tests (pytest against a MySQL + Redis service container), frontend tests (vitest).
 
 ## Troubleshooting
 
-**Email not arriving in development**: The verification URL is printed to `docker compose logs backend`. Check there first.
+**Email not arriving in development**: With `EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend` (the local default), the verification URL is printed straight to the terminal running `runserver`. Check there first.
 
-**WebSocket not connecting**: Confirm Daphne is running in the backend container (not Django's runserver). Check `docker compose logs backend`.
+**WebSocket not connecting**: Confirm you're running `python manage.py runserver` (not `gunicorn`/WSGI-only) — Channels patches `runserver` to serve ASGI automatically in `DEBUG` mode.
 
-**Scraping job stuck at "running"**: Check `docker compose logs celery_scraping_worker`. The OECD scraper requires Chromium — confirm `CHROME_BINARY_PATH` and `CHROMEDRIVER_PATH` match the paths in `Dockerfile.scraping`.
+**Scraping job stuck at "running"**: Check the terminal running `celery -A config worker`. The OECD scraper requires Chrome + ChromeDriver — confirm `CHROME_BINARY_PATH` and `CHROMEDRIVER_PATH` in `.env` point to valid local paths.
 
-**Audit logs not pruning**: Confirm `celery_beat` is running. The retention task runs monthly on a schedule.
+**Audit logs not pruning**: Confirm `celery beat` is running in its own terminal. The retention task runs monthly on a schedule.
+
+**MySQL connection refused**: Confirm your local MySQL service is running and `MYSQL_HOST`/`MYSQL_PORT` in `.env` match it (default `localhost:3306`).
 
 © 2026 Richat Partners — Nouakchott, Mauritania
-
