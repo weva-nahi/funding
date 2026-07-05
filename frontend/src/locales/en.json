@@ -49,7 +49,8 @@
     "source": "Source",
     "country": "Country",
     "sector": "Sector",
-    "language": "Language"
+    "language": "Language",
+    "typeToConfirm": "Type {{word}} to confirm"
   },
   "auth": {
     "login": "Sign in",
@@ -330,7 +331,103 @@
     "noPendingApps": "No pending applications to review.",
     "myProfile": "My Profile",
     "adminProfile": "Admin Profile",
-    "adminProfileDesc": "Manage your account information and password"
+    "adminProfileDesc": "Manage your account information and password",
+    "opportunitiesPage": {
+      "title": "Opportunities Management",
+      "subtitle": "Create, edit, and publish funding opportunities",
+      "newOpportunity": "New Opportunity",
+      "searchPlaceholder": "Search titles...",
+      "allStatuses": "All Statuses",
+      "statusDraft": "Draft",
+      "statusPublished": "Published",
+      "statusArchived": "Archived",
+      "city": "City",
+      "publish": "Publish",
+      "publishConfirmTitle": "Publish this opportunity?",
+      "publishConfirmMessage": "\"{{title}}\" will become visible to all clients immediately, and its amount/deadline will be locked from further edits to maintain transparency for applicants."
+    },
+    "analyticsPage": {
+      "subtitle": "Platform metrics and data visualization",
+      "exportCsv": "Export CSV",
+      "applicationsOverTime": "Applications Over Time (30 days)",
+      "statusDistribution": "Status Distribution",
+      "topSources": "Top Funding Sources"
+    },
+    "adminProfilePage": {
+      "saveFailed": "Failed to save."
+    },
+    "consultingPage": {
+      "title": "Consulting Requests",
+      "subtitle": "Manage client advisory conversations",
+      "attachFile": "Attach file",
+      "priorityLow": "Low",
+      "priorityMedium": "Medium",
+      "priorityHigh": "High"
+    },
+    "usersPage": {
+      "title": "Users Management",
+      "subtitle": "Only verified accounts are shown here.",
+      "searchPlaceholder": "Search email or company…",
+      "role": "Role",
+      "joined": "Joined",
+      "noUsers": "No verified users found.",
+      "active": "Active",
+      "disabled": "Disabled",
+      "disable": "Disable",
+      "enable": "Enable",
+      "deleteUser": "Delete user",
+      "enableConfirmTitle": "Enable user account?",
+      "disableConfirmTitle": "Disable user account?",
+      "enableConfirmDesc": "This will allow {{email}} to log in again. Enter your admin password to confirm.",
+      "disableConfirmDesc": "This will prevent {{email}} from logging in. Enter your admin password to confirm.",
+      "adminPasswordPlaceholder": "Your admin password",
+      "incorrectPassword": "Incorrect password. Please try again.",
+      "deleteConfirmTitle": "Delete user permanently?",
+      "deleteConfirmDesc": "This will permanently delete {{email}} and all their data. This action cannot be undone. Enter your admin password to confirm.",
+      "deleting": "Deleting…",
+      "deletePermanently": "Delete Permanently"
+    },
+    "auditLogsPage": {
+      "subtitle": "Complete record of all system changes — who did what and when",
+      "when": "When",
+      "who": "Who",
+      "what": "What",
+      "system": "System",
+      "notAvailable": "N/A",
+      "entryNum": "Audit Entry #{{id}}",
+      "whatHappened": "What happened",
+      "user": "User",
+      "action": "Action",
+      "resourceType": "Resource Type",
+      "ipAddress": "IP Address",
+      "requestDetails": "Request Details",
+      "method": "Method:",
+      "path": "Path:",
+      "status": "Status:",
+      "whatChanged": "What changed",
+      "noFieldChanges": "No field changes detected",
+      "browserClient": "Browser / Client",
+      "setTo": "Set \"{{label}}\" to \"{{value}}\"",
+      "cleared": "Cleared \"{{label}}\"",
+      "changedFromTo": "Changed \"{{label}}\" from \"{{before}}\" to \"{{after}}\"",
+      "actionCreated": "Created",
+      "actionUpdated": "Updated",
+      "actionDeleted": "Deleted",
+      "loadFailed": "Failed to load audit logs.",
+      "noLogs": "No audit logs found.",
+      "model": {
+        "opportunities": "Funding Opportunity",
+        "applications": "Application",
+        "auth": "User Account",
+        "users": "User Account",
+        "consulting": "Consulting Request",
+        "scraping": "Scraping Job",
+        "notifications": "Notification",
+        "analytics": "Analytics",
+        "audit": "Audit Log",
+        "documents": "Document"
+      }
+    }
   },
   "adminNav": {
     "dashboard": "Dashboard",
@@ -349,6 +446,81 @@
     "submitFailed": "Submission failed. Please try again.",
     "notFound": "Page not found",
     "notFoundDesc": "The page you're looking for doesn't exist or has been moved.",
-    "backHome": "Back to home"
+    "backHome": "Back to home",
+    "boundaryTitle": "Something went wrong",
+    "boundaryDesc": "The application hit an unexpected error while rendering this page. The technical detail below (also logged to the browser console) can help diagnose the problem.",
+    "unknownError": "Unknown error",
+    "reload": "Reload application"
+  },
+  "home": {
+    "hero": {
+      "titlePrefix": "Access ",
+      "titleHighlight": "Climate Finance",
+      "titleSuffix": " for Your Business",
+      "subtitle": "Richat Funding Tracker automatically discovers international climate funding opportunities from GEF, GCF, World Bank, OECD and helps you apply and track your progress in one place.",
+      "getStarted": "Get Started Free",
+      "browseOpportunities": "Browse Opportunities"
+    },
+    "sourcesLabel": "Automatically monitoring these international funding sources",
+    "stats": {
+      "fundingSources": "Funding Sources Monitored",
+      "countries": "Countries Covered",
+      "consultants": "Expert Consultants",
+      "tracking": "Application Tracking",
+      "trackingValue": "Real-time"
+    },
+    "howItWorks": {
+      "title": "How It Works",
+      "subtitle": "From discovery to approval, we handle the complexity so you can focus on your project.",
+      "discovery": {
+        "title": "Automated Discovery",
+        "desc": "Our scrapers continuously monitor 4 international funding databases and surface only opportunities relevant to Mauritania with confirmed amounts and deadlines."
+      },
+      "applications": {
+        "title": "Simple Applications",
+        "desc": "Apply with a structured motivation letter and supporting documents. Track every status update in real time, with direct messaging to our review team."
+      },
+      "support": {
+        "title": "Expert Support",
+        "desc": "Richat Partners consultants review applications and provide guidance through our built-in consulting channel."
+      }
+    },
+    "whatWeTrack": {
+      "title": "What We Track",
+      "subtitle": "We focus exclusively on funding compatible with ethical finance principles: grants, concessional financing, and blended finance.",
+      "grants": {
+        "title": "Grants",
+        "desc": "Non-repayable funds from international climate institutions for qualifying projects."
+      },
+      "concessional": {
+        "title": "Concessional Finance",
+        "desc": "Below-market-rate financing with favorable terms for sustainable development."
+      },
+      "blended": {
+        "title": "Blended Finance",
+        "desc": "Combinations of public grants and private capital structured to maximize impact."
+      }
+    },
+    "features": {
+      "title": "Platform Features",
+      "multiSource": {
+        "title": "Multi-Source Monitoring",
+        "desc": "GEF, GCF, World Bank, OECD - all in one dashboard. No more manually checking different websites."
+      },
+      "consulting": {
+        "title": "Expert Consulting",
+        "desc": "Richat Partners provides hands-on guidance to strengthen your applications and improve your chances of approval."
+      },
+      "notifications": {
+        "title": "Real-time Notifications",
+        "desc": "Instant alerts when your application status changes, new matching opportunities appear, or deadlines approach."
+      }
+    },
+    "cta": {
+      "title": "Ready to find your funding?",
+      "subtitle": "Join Mauritanian businesses using Richat Funding Tracker to discover and apply for international climate finance.",
+      "button": "Create Free Account"
+    },
+    "footer": "© {{year}} Richat Partners, Nouakchott, Mauritania. All rights reserved."
   }
 }

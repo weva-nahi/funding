@@ -114,7 +114,7 @@ export function ClientLayout() {
 
   return (
     <div className="flex h-screen bg-muted/30">
-      <aside className={`fixed inset-y-0 start-0 z-50 w-64 transform bg-white border-e shadow-lg transition-transform duration-300 lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'}`}>
+      <aside className={`fixed inset-y-0 start-0 z-50 w-64 transform bg-white border-e shadow-lg transition-transform duration-300 lg:static lg:translate-x-0 lg:rtl:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'}`}>
         <div className="flex h-16 items-center gap-2 border-b px-6">
           <Link to="/dashboard" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <img src={richatLogo} alt="Richat Partners" className="h-8 w-8 rounded-lg object-cover" />

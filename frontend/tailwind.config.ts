@@ -1,3 +1,5 @@
+import tailwindcssAnimate from "tailwindcss-animate"
+
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ["class"],
@@ -48,10 +50,13 @@ export default {
           foreground: "hsl(var(--sidebar-foreground))",
           accent: "hsl(var(--sidebar-accent))",
         },
+        // Named "teal" for historical reasons (kept to avoid renaming every
+        // teal-* class across the app) — the palette itself is the navy blue
+        // sampled from the Richat Partners logo (RGB 34,79,138 at the 700 step).
         teal: {
-          50: "#f0fdfa", 100: "#ccfbf1", 200: "#99f6e4", 300: "#5eead4",
-          400: "#2dd4bf", 500: "#14b8a6", 600: "#0d9488", 700: "#0f766e",
-          800: "#115e59", 900: "#134e4a", 950: "#042f2e",
+          50: "#f3f7fc", 100: "#e7eef9", 200: "#c6d8f1", 300: "#9dbde7",
+          400: "#6c9cda", 500: "#3375cc", 600: "#2b63ab", 700: "#224f8b",
+          800: "#1d4272", 900: "#16345a", 950: "#0e2139",
         },
       },
       borderRadius: {
@@ -78,5 +83,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [tailwindcssAnimate],
 }

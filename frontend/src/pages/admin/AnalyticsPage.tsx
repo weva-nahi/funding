@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import api from '@/lib/axios'
 import { DownloadCloud, BarChart3 } from 'lucide-react'
 import {
@@ -31,9 +32,9 @@ interface SourceRow {
 }
 
 const COLORS = [
-  '#0f766e',
-  '#14b8a6',
-  '#5eead4',
+  '#224f8b',
+  '#3375cc',
+  '#9dbde7',
   '#f59e0b',
   '#ef4444',
   '#6366f1',
@@ -41,6 +42,7 @@ const COLORS = [
 ]
 
 export function AnalyticsPage() {
+  const { t } = useTranslation()
   const { data: activity, isLoading: aLoading } = useQuery<ActivityPoint[]>({
     queryKey: ['analytics-activity'],
     queryFn: () =>
@@ -73,17 +75,17 @@ export function AnalyticsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Full Analytics
+            {t('admin.fullAnalytics')}
           </h1>
           <p className="text-muted-foreground mt-1">
-            Platform metrics and data visualization
+            {t('admin.analyticsPage.subtitle')}
           </p>
         </div>
         <button
           onClick={handleExport}
           className="inline-flex items-center gap-2 rounded-lg bg-white border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
         >
-          <DownloadCloud className="h-4 w-4" /> Export CSV
+          <DownloadCloud className="h-4 w-4" /> {t('admin.analyticsPage.exportCsv')}
         </button>
       </div>
 
@@ -91,7 +93,7 @@ export function AnalyticsPage() {
         <div className="flex items-center gap-2 mb-4 border-b pb-4">
           <BarChart3 className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-semibold">
-            Applications Over Time (30 days)
+            {t('admin.analyticsPage.applicationsOverTime')}
           </h2>
         </div>
         {aLoading ? (
@@ -106,7 +108,7 @@ export function AnalyticsPage() {
               <Line
                 type="monotone"
                 dataKey="count"
-                stroke="#0f766e"
+                stroke="#224f8b"
                 strokeWidth={2}
                 dot={false}
               />
@@ -118,7 +120,7 @@ export function AnalyticsPage() {
       <div className="grid sm:grid-cols-2 gap-6">
         <div className="rounded-xl border bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold mb-4 border-b pb-4">
-            Status Distribution
+            {t('admin.analyticsPage.statusDistribution')}
           </h2>
           <ResponsiveContainer width="100%" height={240}>
             <PieChart>
@@ -142,7 +144,7 @@ export function AnalyticsPage() {
         </div>
         <div className="rounded-xl border bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold mb-4 border-b pb-4">
-            Top Funding Sources
+            {t('admin.analyticsPage.topSources')}
           </h2>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={sources ?? []}>
@@ -150,7 +152,7 @@ export function AnalyticsPage() {
               <XAxis dataKey="source" tick={{ fontSize: 11 }} />
               <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
               <Tooltip />
-              <Bar dataKey="count" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="count" fill="#3375cc" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

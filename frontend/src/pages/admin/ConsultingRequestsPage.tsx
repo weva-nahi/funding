@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/axios'
 import { formatDate, formatRelativeDate } from '@/utils/formatDate'
@@ -27,6 +28,7 @@ interface ConsultingReq {
 }
 
 function AdminConversation({ req }: { req: ConsultingReq }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [message, setMessage] = useState('')
   const [attachment, setAttachment] = useState<File | null>(null)
@@ -59,7 +61,7 @@ function AdminConversation({ req }: { req: ConsultingReq }) {
     <div className="flex flex-col border-t">
       <div className="overflow-y-auto p-4 space-y-3 max-h-72">
         {messages.length === 0 ? (
-          <p className="text-center text-sm text-muted-foreground py-6">No messages yet. Start the conversation below.</p>
+          <p className="text-center text-sm text-muted-foreground py-6">{t('consulting.startConversation')}</p>
         ) : (
           messages.map((msg) => {
             const isAdmin = msg.sender_role === 'admin'
@@ -116,7 +118,7 @@ function AdminConversation({ req }: { req: ConsultingReq }) {
           <button
             onClick={() => fileRef.current?.click()}
             className="rounded-lg border p-2.5 hover:bg-muted transition-colors"
-            title="Attach file"
+            title={t('admin.consultingPage.attachFile')}
           >
             <Paperclip className="h-4 w-4 text-muted-foreground" />
           </button>
@@ -137,7 +139,7 @@ function AdminConversation({ req }: { req: ConsultingReq }) {
                 sendMessage.mutate()
               }
             }}
-            placeholder="Write a message…"
+            placeholder={t('consulting.writeMessage')}
             className="flex-1 rounded-lg border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
           <button
@@ -154,6 +156,7 @@ function AdminConversation({ req }: { req: ConsultingReq }) {
 }
 
 export function ConsultingRequestsPage() {
+  const { t } = useTranslation()
   const [page, setPage] = useState(1)
   const [expandedId, setExpandedId] = useState<number | null>(null)
 
@@ -167,8 +170,8 @@ export function ConsultingRequestsPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Consulting Requests</h1>
-        <p className="text-muted-foreground mt-1">Manage client advisory conversations</p>
+        <h1 className="text-2xl font-bold tracking-tight">{t('admin.consultingPage.title')}</h1>
+        <p className="text-muted-foreground mt-1">{t('admin.consultingPage.subtitle')}</p>
       </div>
 
       <div className="space-y-3">
@@ -176,11 +179,11 @@ export function ConsultingRequestsPage() {
           <div className="h-32 rounded-xl border bg-muted animate-pulse" />
         ) : isError ? (
           <div className="text-center p-8 text-red-600 bg-white border rounded-xl">
-            Failed to load requests.
+            {t('errors.loadFailed')}
           </div>
         ) : (data?.results?.length ?? 0) === 0 ? (
           <div className="text-center p-8 text-muted-foreground bg-white border rounded-xl">
-            No consulting requests found.
+            {t('consulting.noRequests')}
           </div>
         ) : (
           data?.results?.map((req) => {
@@ -202,7 +205,7 @@ export function ConsultingRequestsPage() {
                           : 'bg-gray-100 text-gray-700'
                       }`}
                     >
-                      {req.priority}
+                      {t(`admin.consultingPage.priority${req.priority.charAt(0).toUpperCase()}${req.priority.slice(1)}`)}
                     </span>
                     <div className="min-w-0">
                       <p className="font-medium text-sm">
@@ -214,7 +217,7 @@ export function ConsultingRequestsPage() {
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0 ml-3">
                     <span className="text-xs text-muted-foreground">
-                      {messages.length} msg{messages.length !== 1 ? 's' : ''}
+                      {t('consulting.messageCount', { count: messages.length })}
                     </span>
                     <span className="text-xs text-muted-foreground hidden sm:block">
                       {formatDate(req.created_at)}
@@ -241,14 +244,14 @@ export function ConsultingRequestsPage() {
             disabled={!data?.previous}
             className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50"
           >
-            Previous
+            {t('common.previous')}
           </button>
           <button
             onClick={() => setPage((p) => p + 1)}
             disabled={!data?.next}
             className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50"
           >
-            Next
+            {t('common.next')}
           </button>
         </div>
       )}

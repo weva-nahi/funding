@@ -49,7 +49,8 @@
     "source": "Source",
     "country": "Pays",
     "sector": "Secteur",
-    "language": "Langue"
+    "language": "Langue",
+    "typeToConfirm": "Tapez {{word}} pour confirmer"
   },
   "auth": {
     "login": "Connexion",
@@ -330,7 +331,103 @@
     "noPendingApps": "Aucune candidature en attente à examiner.",
     "myProfile": "Mon profil",
     "adminProfile": "Profil administrateur",
-    "adminProfileDesc": "Gérez les informations et le mot de passe de votre compte"
+    "adminProfileDesc": "Gérez les informations et le mot de passe de votre compte",
+    "opportunitiesPage": {
+      "title": "Gestion des opportunités",
+      "subtitle": "Créez, modifiez et publiez des opportunités de financement",
+      "newOpportunity": "Nouvelle opportunité",
+      "searchPlaceholder": "Rechercher des titres...",
+      "allStatuses": "Tous les statuts",
+      "statusDraft": "Brouillon",
+      "statusPublished": "Publié",
+      "statusArchived": "Archivé",
+      "city": "Ville",
+      "publish": "Publier",
+      "publishConfirmTitle": "Publier cette opportunité ?",
+      "publishConfirmMessage": "« {{title}} » deviendra visible pour tous les clients immédiatement, et son montant/échéance seront verrouillés pour toute modification ultérieure afin de garantir la transparence envers les candidats."
+    },
+    "analyticsPage": {
+      "subtitle": "Statistiques de la plateforme et visualisation des données",
+      "exportCsv": "Exporter en CSV",
+      "applicationsOverTime": "Candidatures dans le temps (30 jours)",
+      "statusDistribution": "Répartition par statut",
+      "topSources": "Principales sources de financement"
+    },
+    "adminProfilePage": {
+      "saveFailed": "Échec de l'enregistrement."
+    },
+    "consultingPage": {
+      "title": "Demandes de conseil",
+      "subtitle": "Gérez les conversations de conseil avec les clients",
+      "attachFile": "Joindre un fichier",
+      "priorityLow": "Basse",
+      "priorityMedium": "Moyenne",
+      "priorityHigh": "Haute"
+    },
+    "usersPage": {
+      "title": "Gestion des utilisateurs",
+      "subtitle": "Seuls les comptes vérifiés sont affichés ici.",
+      "searchPlaceholder": "Rechercher par e-mail ou entreprise…",
+      "role": "Rôle",
+      "joined": "Inscrit le",
+      "noUsers": "Aucun utilisateur vérifié trouvé.",
+      "active": "Actif",
+      "disabled": "Désactivé",
+      "disable": "Désactiver",
+      "enable": "Activer",
+      "deleteUser": "Supprimer l'utilisateur",
+      "enableConfirmTitle": "Activer ce compte utilisateur ?",
+      "disableConfirmTitle": "Désactiver ce compte utilisateur ?",
+      "enableConfirmDesc": "Cela permettra à {{email}} de se reconnecter. Entrez votre mot de passe administrateur pour confirmer.",
+      "disableConfirmDesc": "Cela empêchera {{email}} de se connecter. Entrez votre mot de passe administrateur pour confirmer.",
+      "adminPasswordPlaceholder": "Votre mot de passe administrateur",
+      "incorrectPassword": "Mot de passe incorrect. Veuillez réessayer.",
+      "deleteConfirmTitle": "Supprimer définitivement cet utilisateur ?",
+      "deleteConfirmDesc": "Cela supprimera définitivement {{email}} et toutes ses données. Cette action est irréversible. Entrez votre mot de passe administrateur pour confirmer.",
+      "deleting": "Suppression…",
+      "deletePermanently": "Supprimer définitivement"
+    },
+    "auditLogsPage": {
+      "subtitle": "Registre complet de tous les changements système — qui a fait quoi et quand",
+      "when": "Quand",
+      "who": "Qui",
+      "what": "Quoi",
+      "system": "Système",
+      "notAvailable": "N/D",
+      "entryNum": "Entrée d'audit #{{id}}",
+      "whatHappened": "Ce qui s'est passé",
+      "user": "Utilisateur",
+      "action": "Action",
+      "resourceType": "Type de ressource",
+      "ipAddress": "Adresse IP",
+      "requestDetails": "Détails de la requête",
+      "method": "Méthode :",
+      "path": "Chemin :",
+      "status": "Statut :",
+      "whatChanged": "Ce qui a changé",
+      "noFieldChanges": "Aucun changement de champ détecté",
+      "browserClient": "Navigateur / Client",
+      "setTo": "« {{label}} » défini à « {{value}} »",
+      "cleared": "« {{label}} » effacé",
+      "changedFromTo": "« {{label}} » changé de « {{before}} » à « {{after}} »",
+      "actionCreated": "Créé",
+      "actionUpdated": "Modifié",
+      "actionDeleted": "Supprimé",
+      "loadFailed": "Échec du chargement des journaux d'audit.",
+      "noLogs": "Aucun journal d'audit trouvé.",
+      "model": {
+        "opportunities": "Opportunité de financement",
+        "applications": "Candidature",
+        "auth": "Compte utilisateur",
+        "users": "Compte utilisateur",
+        "consulting": "Demande de conseil",
+        "scraping": "Tâche de scraping",
+        "notifications": "Notification",
+        "analytics": "Analytique",
+        "audit": "Journal d'audit",
+        "documents": "Document"
+      }
+    }
   },
   "adminNav": {
     "dashboard": "Tableau de bord",
@@ -349,6 +446,81 @@
     "submitFailed": "Échec de l'envoi. Veuillez réessayer.",
     "notFound": "Page non trouvée",
     "notFoundDesc": "La page que vous recherchez n'existe pas ou a été déplacée.",
-    "backHome": "Retour à l'accueil"
+    "backHome": "Retour à l'accueil",
+    "boundaryTitle": "Une erreur s'est produite",
+    "boundaryDesc": "L'application a rencontré une erreur inattendue lors de l'affichage de cette page. Le détail technique ci-dessous (également enregistré dans la console du navigateur) peut aider à diagnostiquer le problème.",
+    "unknownError": "Erreur inconnue",
+    "reload": "Recharger l'application"
+  },
+  "home": {
+    "hero": {
+      "titlePrefix": "Accédez au ",
+      "titleHighlight": "financement climatique",
+      "titleSuffix": " pour votre entreprise",
+      "subtitle": "Richat Funding Tracker découvre automatiquement les opportunités de financement climatique international du GEF, GCF, de la Banque mondiale et de l'OCDE, et vous aide à candidater et suivre votre progression au même endroit.",
+      "getStarted": "Commencer gratuitement",
+      "browseOpportunities": "Parcourir les opportunités"
+    },
+    "sourcesLabel": "Surveillance automatique de ces sources de financement internationales",
+    "stats": {
+      "fundingSources": "Sources de financement surveillées",
+      "countries": "Pays couverts",
+      "consultants": "Consultants experts",
+      "tracking": "Suivi des candidatures",
+      "trackingValue": "Temps réel"
+    },
+    "howItWorks": {
+      "title": "Comment ça marche",
+      "subtitle": "De la découverte à l'approbation, nous gérons la complexité pour que vous puissiez vous concentrer sur votre projet.",
+      "discovery": {
+        "title": "Découverte automatisée",
+        "desc": "Nos robots surveillent en continu 4 bases de données de financement internationales et ne font remonter que les opportunités pertinentes pour la Mauritanie, avec montants et échéances confirmés."
+      },
+      "applications": {
+        "title": "Candidatures simplifiées",
+        "desc": "Candidatez avec une lettre de motivation structurée et des documents justificatifs. Suivez chaque mise à jour de statut en temps réel, avec messagerie directe vers notre équipe de révision."
+      },
+      "support": {
+        "title": "Accompagnement expert",
+        "desc": "Les consultants de Richat Partners examinent les candidatures et fournissent des conseils via notre canal de consultation intégré."
+      }
+    },
+    "whatWeTrack": {
+      "title": "Ce que nous suivons",
+      "subtitle": "Nous nous concentrons exclusivement sur les financements compatibles avec les principes de finance éthique : subventions, financement concessionnel et financement mixte.",
+      "grants": {
+        "title": "Subventions",
+        "desc": "Fonds non remboursables provenant d'institutions climatiques internationales pour les projets éligibles."
+      },
+      "concessional": {
+        "title": "Financement concessionnel",
+        "desc": "Financement à des taux inférieurs au marché avec des conditions favorables pour le développement durable."
+      },
+      "blended": {
+        "title": "Financement mixte",
+        "desc": "Combinaisons de subventions publiques et de capitaux privés structurées pour maximiser l'impact."
+      }
+    },
+    "features": {
+      "title": "Fonctionnalités de la plateforme",
+      "multiSource": {
+        "title": "Surveillance multi-sources",
+        "desc": "GEF, GCF, Banque mondiale, OCDE - tout dans un seul tableau de bord. Plus besoin de vérifier manuellement différents sites."
+      },
+      "consulting": {
+        "title": "Conseil expert",
+        "desc": "Richat Partners fournit un accompagnement concret pour renforcer vos candidatures et améliorer vos chances d'approbation."
+      },
+      "notifications": {
+        "title": "Notifications en temps réel",
+        "desc": "Alertes instantanées lorsque le statut de votre candidature change, que de nouvelles opportunités correspondantes apparaissent, ou que des échéances approchent."
+      }
+    },
+    "cta": {
+      "title": "Prêt à trouver votre financement ?",
+      "subtitle": "Rejoignez les entreprises mauritaniennes qui utilisent Richat Funding Tracker pour découvrir et candidater à des financements climatiques internationaux.",
+      "button": "Créer un compte gratuit"
+    },
+    "footer": "© {{year}} Richat Partners, Nouakchott, Mauritanie. Tous droits réservés."
   }
 }

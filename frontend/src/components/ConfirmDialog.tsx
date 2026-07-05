@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { AlertTriangle, X } from 'lucide-react'
 
 interface ConfirmDialogProps {
@@ -30,14 +31,15 @@ export function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   variant = 'default',
   requireTypedConfirmation,
   isLoading = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation()
   const [typedValue, setTypedValue] = useState('')
 
   useEffect(() => {
@@ -46,6 +48,8 @@ export function ConfirmDialog({
 
   if (!open) return null
 
+  const resolvedConfirmLabel = confirmLabel ?? t('common.confirm')
+  const resolvedCancelLabel = cancelLabel ?? t('common.cancel')
   const canConfirm = !requireTypedConfirmation || typedValue === requireTypedConfirmation
 
   const colors = {
@@ -74,7 +78,7 @@ export function ConfirmDialog({
         {requireTypedConfirmation && (
           <div className="mb-4">
             <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-              Type <span className="font-mono font-bold text-foreground">{requireTypedConfirmation}</span> to confirm
+              {t('common.typeToConfirm', { word: requireTypedConfirmation })}
             </label>
             <input
               type="text"
@@ -89,11 +93,11 @@ export function ConfirmDialog({
         <div className="flex gap-3 justify-end pt-2">
           <button onClick={onCancel} disabled={isLoading}
             className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50">
-            {cancelLabel}
+            {resolvedCancelLabel}
           </button>
           <button onClick={onConfirm} disabled={isLoading || !canConfirm}
             className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${colors.button}`}>
-            {isLoading ? 'Processing...' : confirmLabel}
+            {isLoading ? t('common.processing') : resolvedConfirmLabel}
           </button>
         </div>
       </div>

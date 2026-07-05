@@ -5,8 +5,14 @@ from datetime import timedelta
 from pathlib import Path
 
 from celery.schedules import crontab
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+# Native local dev has no Docker env_file — load .env directly, for every
+# entry point (runserver, celery worker/beat, wsgi, asgi) that imports settings.
+# .env lives at the repo root (one level above backend/), matching README setup.
+load_dotenv(BASE_DIR.parent / ".env")
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "insecure-dev-key-change-in-production")
 # DEBUG defaults to False — development.py explicitly sets it True
@@ -87,17 +93,27 @@ ASGI_APPLICATION = "config.asgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("POSTGRES_DB", "richat_db"),
-        "USER": os.environ.get("POSTGRES_USER", "richat_user"),
-        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "richat_password_change_me"),
-        "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
-        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": os.environ.get("MYSQL_DATABASE", "richat_db"),
+        "USER": os.environ.get("MYSQL_USER", "richat_user"),
+        "PASSWORD": os.environ.get("MYSQL_PASSWORD", "richat_password_change_me"),
+        "HOST": os.environ.get("MYSQL_HOST", "localhost"),
+        "PORT": os.environ.get("MYSQL_PORT", "3306"),
         "CONN_MAX_AGE": 60,
+        "OPTIONS": {
+            "charset": "utf8mb4",
+            # default_storage_engine is forced here because some local MySQL
+            # installs (e.g. WAMP) default to MyISAM, whose 1000-byte key
+            # length limit breaks the unique index on User.email (utf8mb4
+            # EmailField needs ~1016 bytes) — InnoDB supports up to 3072.
+            "init_command": (
+                "SET sql_mode='STRICT_TRANS_TABLES', default_storage_engine=INNODB"
+            ),
+        },
     }
 }
 
-REDIS_CACHE_URL = os.environ.get("REDIS_CACHE_URL", "redis://redis:6379/4")
+REDIS_CACHE_URL = os.environ.get("REDIS_CACHE_URL", "redis://localhost:6379/4")
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
@@ -156,13 +172,13 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [os.environ.get("CHANNEL_LAYERS_BACKEND", "redis://redis:6379/3")],
+            "hosts": [os.environ.get("CHANNEL_LAYERS_BACKEND", "redis://localhost:6379/3")],
         },
     },
 }
 
-CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://redis:6379/1")
-CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://redis:6379/2")
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/1")
+CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379/2")
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"

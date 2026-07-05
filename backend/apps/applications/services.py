@@ -5,6 +5,7 @@ from django.conf import settings
 from django.db import IntegrityError
 
 from common.exceptions import ApplicationError
+from common.utils.tasks import safe_delay
 
 from .models import Application, ApplicationMessage, ApplicationStatusHistory
 
@@ -115,7 +116,7 @@ def approve_application(
         category="application",
         priority="high",
     )
-    send_application_approved_email.delay(application.id)
+    safe_delay(send_application_approved_email, application.id)
     return application
 
 def reject_application(
@@ -142,7 +143,7 @@ def reject_application(
         category="application",
         priority="medium",
     )
-    send_application_rejected_email.delay(application.id)
+    safe_delay(send_application_rejected_email, application.id)
     return application
 
 

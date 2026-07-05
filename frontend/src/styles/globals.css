@@ -11,23 +11,23 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 168 76% 26%;
+    --primary: 214 60% 34%;
     --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 168 76% 96%;
-    --accent-foreground: 168 76% 26%;
+    --accent: 214 60% 96%;
+    --accent-foreground: 214 60% 34%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 168 76% 26%;
+    --ring: 214 60% 34%;
     --radius: 0.625rem;
-    --sidebar: 168 40% 97%;
+    --sidebar: 214 40% 97%;
     --sidebar-foreground: 222.2 84% 4.9%;
-    --sidebar-accent: 168 76% 93%;
+    --sidebar-accent: 214 60% 93%;
   }
 
   .dark {
@@ -37,22 +37,22 @@
     --card-foreground: 210 40% 98%;
     --popover: 222.2 84% 6%;
     --popover-foreground: 210 40% 98%;
-    --primary: 168 76% 42%;
+    --primary: 214 60% 50%;
     --primary-foreground: 0 0% 100%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 168 60% 15%;
-    --accent-foreground: 168 76% 80%;
+    --accent: 214 55% 15%;
+    --accent-foreground: 214 60% 80%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 168 76% 42%;
+    --ring: 214 60% 50%;
     --sidebar: 222.2 84% 6%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-accent: 168 60% 12%;
+    --sidebar-accent: 214 55% 12%;
   }
 
   * {
@@ -96,10 +96,10 @@
 
 @keyframes pulse-glow {
   0%, 100% {
-    box-shadow: 0 0 20px rgba(14, 165, 133, 0.3);
+    box-shadow: 0 0 20px rgba(51, 117, 204, 0.3);
   }
   50% {
-    box-shadow: 0 0 40px rgba(14, 165, 133, 0.6);
+    box-shadow: 0 0 40px rgba(51, 117, 204, 0.6);
   }
 }
 

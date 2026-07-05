@@ -34,7 +34,7 @@ DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
 MEDIA_ROOT = BASE_DIR / "test_media"  # noqa: F405
 
 # NE PAS redéfinir la connexion ici. Hériter de base.py qui lit
-# POSTGRES_HOST depuis l'environnement (= "db" dans Docker, PAS "localhost").
+# MYSQL_HOST depuis l'environnement (= "db" dans Docker, PAS "localhost").
 # C'était la seule cause des 30 erreurs "Connection refused".
 DATABASES["default"]["TEST"] = {"NAME": "richat_test_db"}  # noqa: F405
 

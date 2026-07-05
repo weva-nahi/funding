@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Globe, Zap, Shield, ArrowRight, Search, FileText, CheckCircle, Database, Users, TrendingUp } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { SOURCE_LOGOS } from '@/lib/sourceLogos'
@@ -11,14 +12,8 @@ const sources = [
   { key: 'OECD', label: 'OECD' },
 ]
 
-const stats = [
-  { label: 'Funding Sources Monitored', value: '4', icon: Database },
-  { label: 'Countries Covered', value: '1', icon: Globe },
-  { label: 'Expert Consultants', value: '10+', icon: Users },
-  { label: 'Application Tracking', value: 'Real-time', icon: TrendingUp },
-]
-
 export function HomePage() {
+  const { t } = useTranslation()
   const { user, isAuthenticated } = useAuthStore()
   const navigate = useNavigate()
 
@@ -28,6 +23,31 @@ export function HomePage() {
     }
   }, [isAuthenticated, user, navigate])
 
+  const stats = [
+    { label: t('home.stats.fundingSources'), value: '4', icon: Database },
+    { label: t('home.stats.countries'), value: '1', icon: Globe },
+    { label: t('home.stats.consultants'), value: '10+', icon: Users },
+    { label: t('home.stats.tracking'), value: t('home.stats.trackingValue'), icon: TrendingUp },
+  ]
+
+  const howItWorksSteps = [
+    { icon: Search, title: t('home.howItWorks.discovery.title'), desc: t('home.howItWorks.discovery.desc') },
+    { icon: FileText, title: t('home.howItWorks.applications.title'), desc: t('home.howItWorks.applications.desc') },
+    { icon: CheckCircle, title: t('home.howItWorks.support.title'), desc: t('home.howItWorks.support.desc') },
+  ]
+
+  const whatWeTrack = [
+    { title: t('home.whatWeTrack.grants.title'), desc: t('home.whatWeTrack.grants.desc') },
+    { title: t('home.whatWeTrack.concessional.title'), desc: t('home.whatWeTrack.concessional.desc') },
+    { title: t('home.whatWeTrack.blended.title'), desc: t('home.whatWeTrack.blended.desc') },
+  ]
+
+  const features = [
+    { icon: Globe, title: t('home.features.multiSource.title'), desc: t('home.features.multiSource.desc') },
+    { icon: Shield, title: t('home.features.consulting.title'), desc: t('home.features.consulting.desc') },
+    { icon: Zap, title: t('home.features.notifications.title'), desc: t('home.features.notifications.desc') },
+  ]
+
   return (
     <div>
       <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-teal-900 to-slate-900 py-24 lg:py-32">
@@ -36,17 +56,19 @@ export function HomePage() {
           <div className="mx-auto max-w-3xl text-center">
             <div className="animate-fade-in">
               <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl">
-                Access <span className="bg-gradient-to-r from-teal-400 to-emerald-400 bg-clip-text text-transparent">Climate Finance</span> for Your Business
+                {t('home.hero.titlePrefix')}
+                <span className="bg-gradient-to-r from-teal-400 to-emerald-400 bg-clip-text text-transparent">{t('home.hero.titleHighlight')}</span>
+                {t('home.hero.titleSuffix')}
               </h1>
               <p className="mt-6 text-lg text-slate-300 max-w-2xl mx-auto">
-                Richat Funding Tracker automatically discovers international climate funding opportunities from GEF, GCF, World Bank, OECD and helps you apply and track your progress in one place.
+                {t('home.hero.subtitle')}
               </p>
               <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/register" className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-500 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-teal-500/25 hover:bg-teal-400 transition-all hover:shadow-teal-500/40">
-                  Get Started Free <ArrowRight className="h-5 w-5" />
+                  {t('home.hero.getStarted')} <ArrowRight className="h-5 w-5" />
                 </Link>
                 <Link to="/opportunities" className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 backdrop-blur px-8 py-3.5 text-base font-semibold text-white ring-1 ring-white/20 hover:bg-white/20 transition-all">
-                  Browse Opportunities
+                  {t('home.hero.browseOpportunities')}
                 </Link>
               </div>
             </div>
@@ -56,7 +78,7 @@ export function HomePage() {
 
       <section className="border-b py-10 bg-white">
         <div className="container">
-          <p className="text-center text-sm font-medium text-muted-foreground mb-6">Automatically monitoring these international funding sources</p>
+          <p className="text-center text-sm font-medium text-muted-foreground mb-6">{t('home.sourcesLabel')}</p>
           <div className="flex flex-wrap justify-center items-center gap-10">
             {sources.map(s => (
               <div key={s.key} className="flex flex-col items-center gap-2 opacity-70 hover:opacity-100 transition-opacity grayscale hover:grayscale-0">
@@ -84,28 +106,12 @@ export function HomePage() {
 
       <section className="py-20 bg-white">
         <div className="container">
-          <h2 className="text-3xl font-bold text-center mb-4">How It Works</h2>
+          <h2 className="text-3xl font-bold text-center mb-4">{t('home.howItWorks.title')}</h2>
           <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
-            From discovery to approval, we handle the complexity so you can focus on your project.
+            {t('home.howItWorks.subtitle')}
           </p>
           <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-            {[
-              {
-                icon: Search,
-                title: 'Automated Discovery',
-                desc: 'Our scrapers continuously monitor 4 international funding databases and surface only opportunities relevant to Mauritania with confirmed amounts and deadlines.',
-              },
-              {
-                icon: FileText,
-                title: 'Simple Applications',
-                desc: 'Apply with a structured motivation letter and supporting documents. Track every status update in real time, with direct messaging to our review team.',
-              },
-              {
-                icon: CheckCircle,
-                title: 'Expert Support',
-                desc: 'Richat Partners consultants review applications and provide guidance through our built-in consulting channel.',
-              },
-            ].map(({ icon: Icon, title, desc }, i) => (
+            {howItWorksSteps.map(({ icon: Icon, title, desc }, i) => (
               <div key={i} className="relative rounded-2xl bg-muted/50 p-8 hover:shadow-md transition-all group border">
                 <div className="absolute -top-4 left-8 h-8 w-8 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white text-sm font-bold">{i + 1}</div>
                 <Icon className="h-10 w-10 text-primary mb-4 mt-2 group-hover:scale-110 transition-transform" />
@@ -119,16 +125,12 @@ export function HomePage() {
 
       <section className="py-20 bg-muted/30">
         <div className="container">
-          <h2 className="text-3xl font-bold text-center mb-4">What We Track</h2>
+          <h2 className="text-3xl font-bold text-center mb-4">{t('home.whatWeTrack.title')}</h2>
           <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
-            We focus exclusively on funding compatible with ethical finance principles: grants, concessional financing, and blended finance.
+            {t('home.whatWeTrack.subtitle')}
           </p>
           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            {[
-              { title: 'Grants', desc: 'Non-repayable funds from international climate institutions for qualifying projects.' },
-              { title: 'Concessional Finance', desc: 'Below-market-rate financing with favorable terms for sustainable development.' },
-              { title: 'Blended Finance', desc: 'Combinations of public grants and private capital structured to maximize impact.' },
-            ].map(({ title, desc }) => (
+            {whatWeTrack.map(({ title, desc }) => (
               <div key={title} className="rounded-xl bg-white border p-6 shadow-sm">
                 <div className="h-2 w-12 bg-gradient-to-r from-teal-500 to-teal-700 rounded-full mb-4" />
                 <h3 className="font-semibold text-lg mb-2">{title}</h3>
@@ -141,25 +143,9 @@ export function HomePage() {
 
       <section className="py-20 bg-white">
         <div className="container">
-          <h2 className="text-3xl font-bold text-center mb-12">Platform Features</h2>
+          <h2 className="text-3xl font-bold text-center mb-12">{t('home.features.title')}</h2>
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {[
-              {
-                icon: Globe,
-                title: 'Multi-Source Monitoring',
-                desc: 'GEF, GCF, World Bank, OECD - all in one dashboard. No more manually checking different websites.',
-              },
-              {
-                icon: Shield,
-                title: 'Expert Consulting',
-                desc: 'Richat Partners provides hands-on guidance to strengthen your applications and improve your chances of approval.',
-              },
-              {
-                icon: Zap,
-                title: 'Real-time Notifications',
-                desc: 'Instant alerts when your application status changes, new matching opportunities appear, or deadlines approach.',
-              },
-            ].map(({ icon: Icon, title, desc }, i) => (
+            {features.map(({ icon: Icon, title, desc }, i) => (
               <div key={i} className="rounded-2xl bg-gradient-to-br from-muted/50 to-muted p-8 hover:shadow-md transition-all">
                 <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
                   <Icon className="h-6 w-6 text-primary" />
@@ -174,19 +160,19 @@ export function HomePage() {
 
       <section className="py-20 bg-gradient-to-r from-teal-600 to-teal-800">
         <div className="container text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">Ready to find your funding?</h2>
+          <h2 className="text-3xl font-bold text-white mb-4">{t('home.cta.title')}</h2>
           <p className="text-teal-100 mb-8 max-w-xl mx-auto">
-            Join Mauritanian businesses using Richat Funding Tracker to discover and apply for international climate finance.
+            {t('home.cta.subtitle')}
           </p>
           <Link to="/register" className="inline-flex items-center gap-2 rounded-xl bg-white px-8 py-3.5 text-base font-semibold text-teal-700 shadow-lg hover:bg-teal-50 transition-all">
-            Create Free Account <ArrowRight className="h-5 w-5" />
+            {t('home.cta.button')} <ArrowRight className="h-5 w-5" />
           </Link>
         </div>
       </section>
 
       <footer className="border-t py-8 bg-white">
         <div className="container text-center text-sm text-muted-foreground">
-          <p>2026 Richat Partners, Nouakchott, Mauritania. All rights reserved.</p>
+          <p>{t('home.footer', { year: new Date().getFullYear() })}</p>
         </div>
       </footer>
     </div>

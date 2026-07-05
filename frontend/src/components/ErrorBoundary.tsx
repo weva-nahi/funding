@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import i18n from '@/lib/i18n'
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -62,11 +63,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             }}
           >
             <h1 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-              Something went wrong
+              {i18n.t('errors.boundaryTitle')}
             </h1>
             <p style={{ color: '#475569', marginTop: '0.5rem', fontSize: '0.875rem' }}>
-              The application hit an unexpected error while rendering this page. The technical
-              detail below (also logged to the browser console) can help diagnose the problem.
+              {i18n.t('errors.boundaryDesc')}
             </p>
             <pre
               style={{
@@ -81,13 +81,13 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 wordBreak: 'break-word',
               }}
             >
-              {this.state.error?.message || 'Unknown error'}
+              {this.state.error?.message || i18n.t('errors.unknownError')}
             </pre>
             <button
               onClick={this.handleReload}
               style={{
                 marginTop: '1.5rem',
-                background: '#0f766e',
+                background: '#224f8b',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '0.5rem',
@@ -97,7 +97,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 cursor: 'pointer',
               }}
             >
-              Reload application
+              {i18n.t('errors.reload')}
             </button>
           </div>
         </div>

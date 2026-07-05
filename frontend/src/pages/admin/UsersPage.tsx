@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/axios'
 import { Search, UserCheck, UserX, Trash2, Lock } from 'lucide-react'
@@ -7,6 +8,7 @@ import { formatDate } from '@/utils/formatDate'
 import type { User, Paginated } from '@/types'
 
 export function UsersPage() {
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const debouncedSearch = useDebounce(search)
@@ -41,7 +43,7 @@ export function UsersPage() {
       setTogglePasswordError('')
     },
     onError: () => {
-      setTogglePasswordError('Incorrect password. Please try again.')
+      setTogglePasswordError(t('admin.usersPage.incorrectPassword'))
     },
   })
 
@@ -58,7 +60,7 @@ export function UsersPage() {
       setDeletePasswordError('')
     },
     onError: () => {
-      setDeletePasswordError('Incorrect password. Please try again.')
+      setDeletePasswordError(t('admin.usersPage.incorrectPassword'))
     },
   })
 
@@ -67,8 +69,8 @@ export function UsersPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Users Management</h1>
-        <p className="text-muted-foreground mt-1">Only verified accounts are shown here.</p>
+        <h1 className="text-2xl font-bold tracking-tight">{t('admin.usersPage.title')}</h1>
+        <p className="text-muted-foreground mt-1">{t('admin.usersPage.subtitle')}</p>
       </div>
 
       <div className="flex max-w-sm">
@@ -76,7 +78,7 @@ export function UsersPage() {
           <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search email or company…"
+            placeholder={t('admin.usersPage.searchPlaceholder')}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1) }}
             className="w-full rounded-lg border ps-10 pe-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
@@ -89,12 +91,12 @@ export function UsersPage() {
           <table className="w-full text-sm text-start">
             <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
               <tr>
-                <th className="px-6 py-3 font-medium">Company</th>
-                <th className="px-6 py-3 font-medium">Email</th>
-                <th className="px-6 py-3 font-medium">Role</th>
-                <th className="px-6 py-3 font-medium">Status</th>
-                <th className="px-6 py-3 font-medium">Joined</th>
-                <th className="px-6 py-3 font-medium text-end">Actions</th>
+                <th className="px-6 py-3 font-medium">{t('common.company')}</th>
+                <th className="px-6 py-3 font-medium">{t('common.email')}</th>
+                <th className="px-6 py-3 font-medium">{t('admin.usersPage.role')}</th>
+                <th className="px-6 py-3 font-medium">{t('common.status')}</th>
+                <th className="px-6 py-3 font-medium">{t('admin.usersPage.joined')}</th>
+                <th className="px-6 py-3 font-medium text-end">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -103,9 +105,9 @@ export function UsersPage() {
                   <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" />
                 </td></tr>
               ) : isError ? (
-                <tr><td colSpan={6} className="px-6 py-8 text-center text-red-600">Failed to load users.</td></tr>
+                <tr><td colSpan={6} className="px-6 py-8 text-center text-red-600">{t('errors.loadFailed')}</td></tr>
               ) : users.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">No verified users found.</td></tr>
+                <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">{t('admin.usersPage.noUsers')}</td></tr>
               ) : (
                 users.map((user) => (
                   <tr key={user.id} className="border-b last:border-0 hover:bg-muted/20">
@@ -117,17 +119,17 @@ export function UsersPage() {
                       <span className={`px-2 py-1 rounded text-xs font-semibold ${
                         user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'
                       }`}>
-                        {user.role}
+                        {user.role === 'admin' ? t('profile.administrator') : t('profile.client')}
                       </span>
                     </td>
                     <td className="px-6 py-4">
                       {user.is_active ? (
                         <span className="flex items-center gap-1.5 text-emerald-600">
-                          <UserCheck className="h-4 w-4" /> Active
+                          <UserCheck className="h-4 w-4" /> {t('admin.usersPage.active')}
                         </span>
                       ) : (
                         <span className="flex items-center gap-1.5 text-red-600">
-                          <UserX className="h-4 w-4" /> Disabled
+                          <UserX className="h-4 w-4" /> {t('admin.usersPage.disabled')}
                         </span>
                       )}
                     </td>
@@ -142,7 +144,7 @@ export function UsersPage() {
                           }}
                           className="text-sm font-medium text-primary hover:underline"
                         >
-                          {user.is_active ? 'Disable' : 'Enable'}
+                          {user.is_active ? t('admin.usersPage.disable') : t('admin.usersPage.enable')}
                         </button>
                         <button
                           onClick={() => {
@@ -151,7 +153,7 @@ export function UsersPage() {
                             setDeletePasswordError('')
                           }}
                           className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
-                          title="Delete user"
+                          title={t('admin.usersPage.deleteUser')}
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -168,10 +170,10 @@ export function UsersPage() {
       {(data?.count ?? 0) > 20 && (
         <div className="flex justify-center gap-2 mt-4">
           <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={!data?.previous}
-            className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50">Previous</button>
-          <span className="flex items-center px-4 text-sm text-muted-foreground">Page {page}</span>
+            className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50">{t('common.previous')}</button>
+          <span className="flex items-center px-4 text-sm text-muted-foreground">{t('common.page')} {page}</span>
           <button onClick={() => setPage((p) => p + 1)} disabled={!data?.next}
-            className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50">Next</button>
+            className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50">{t('common.next')}</button>
         </div>
       )}
 
@@ -184,12 +186,11 @@ export function UsersPage() {
                 <Lock className={`h-5 w-5 ${confirmToggleUser.enable ? 'text-emerald-600' : 'text-amber-600'}`} />
               </div>
               <div>
-                <h2 className="font-semibold">{confirmToggleUser.enable ? 'Enable' : 'Disable'} user account?</h2>
+                <h2 className="font-semibold">{confirmToggleUser.enable ? t('admin.usersPage.enableConfirmTitle') : t('admin.usersPage.disableConfirmTitle')}</h2>
                 <p className="text-xs text-muted-foreground">
-                  {confirmToggleUser.enable ? 'This will allow' : 'This will prevent'}{' '}
-                  <strong>{confirmToggleUser.user.email}</strong>{' '}
-                  {confirmToggleUser.enable ? 'to log in again.' : 'from logging in.'}
-                  {' '}Enter your admin password to confirm.
+                  {confirmToggleUser.enable
+                    ? t('admin.usersPage.enableConfirmDesc', { email: confirmToggleUser.user.email })
+                    : t('admin.usersPage.disableConfirmDesc', { email: confirmToggleUser.user.email })}
                 </p>
               </div>
             </div>
@@ -198,13 +199,13 @@ export function UsersPage() {
               type="password"
               value={togglePassword}
               onChange={(e) => setTogglePassword(e.target.value)}
-              placeholder="Your admin password"
+              placeholder={t('admin.usersPage.adminPasswordPlaceholder')}
               autoFocus
               className="w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <div className="flex gap-3 justify-end">
               <button onClick={() => setConfirmToggleUser(null)}
-                className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">Cancel</button>
+                className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">{t('common.cancel')}</button>
               <button
                 onClick={() => toggleActive.mutate({
                   id: confirmToggleUser.user.id,
@@ -216,7 +217,7 @@ export function UsersPage() {
                   confirmToggleUser.enable ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'
                 }`}
               >
-                {toggleActive.isPending ? 'Processing…' : 'Confirm'}
+                {toggleActive.isPending ? t('common.processing') : t('common.confirm')}
               </button>
             </div>
           </div>
@@ -232,10 +233,9 @@ export function UsersPage() {
                 <Lock className="h-5 w-5 text-red-600" />
               </div>
               <div>
-                <h2 className="font-semibold">Delete user permanently?</h2>
+                <h2 className="font-semibold">{t('admin.usersPage.deleteConfirmTitle')}</h2>
                 <p className="text-xs text-muted-foreground">
-                  This will permanently delete <strong>{confirmDeleteUser.email}</strong> and all their data.
-                  This action cannot be undone. Enter your admin password to confirm.
+                  {t('admin.usersPage.deleteConfirmDesc', { email: confirmDeleteUser.email })}
                 </p>
               </div>
             </div>
@@ -244,19 +244,19 @@ export function UsersPage() {
               type="password"
               value={deletePassword}
               onChange={(e) => setDeletePassword(e.target.value)}
-              placeholder="Your admin password"
+              placeholder={t('admin.usersPage.adminPasswordPlaceholder')}
               autoFocus
               className="w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <div className="flex gap-3 justify-end">
               <button onClick={() => setConfirmDeleteUser(null)}
-                className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">Cancel</button>
+                className="rounded-lg border px-4 py-2 text-sm hover:bg-muted">{t('common.cancel')}</button>
               <button
                 onClick={() => deleteUser.mutate(confirmDeleteUser.id)}
                 disabled={!deletePassword || deleteUser.isPending}
                 className="rounded-lg bg-red-600 px-6 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
               >
-                {deleteUser.isPending ? 'Deleting…' : 'Delete Permanently'}
+                {deleteUser.isPending ? t('admin.usersPage.deleting') : t('admin.usersPage.deletePermanently')}
               </button>
             </div>
           </div>

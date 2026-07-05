@@ -12,6 +12,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from common.exceptions import AccountLockedError, ApplicationError
 from common.utils.email_i18n import resolve_unsubscribe_token
+from common.utils.tasks import safe_delay
 
 from .models import EmailVerificationToken, PasswordResetToken, Profile, User
 from .tasks import send_reset_password_email, send_verification_email
@@ -52,7 +53,7 @@ def register_user(*, email: str, password: str, role: str = "client", **kwargs) 
             "EMAIL VERIFICATION LINK FOR: %s\n%s\n" + "=" * 60,
             email, verify_url,
         )
-        send_verification_email.delay(existing.id, token)
+        safe_delay(send_verification_email, existing.id, token)
         return existing
 
     with transaction.atomic():
@@ -91,7 +92,7 @@ def register_user(*, email: str, password: str, role: str = "client", **kwargs) 
         email, verify_url,
     )
 
-    send_verification_email.delay(user.id, token)
+    safe_delay(send_verification_email, user.id, token)
     return user
 
 
@@ -117,7 +118,7 @@ def resend_verification_email(*, email: str) -> None:
         email, verify_url,
     )
 
-    send_verification_email.delay(user.id, token)
+    safe_delay(send_verification_email, user.id, token)
 
 
 def unsubscribe_user(*, token: str) -> bool:
@@ -225,7 +226,7 @@ def request_password_reset(*, email: str) -> None:
         email, reset_url,
     )
 
-    send_reset_password_email.delay(user.id, token)
+    safe_delay(send_reset_password_email, user.id, token)
 
 
 def reset_password(*, token: str, new_password: str) -> None:

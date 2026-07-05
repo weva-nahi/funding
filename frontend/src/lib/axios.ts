@@ -3,15 +3,12 @@
  * All token logic lives here: storage, attachment, silent refresh, redirect.
  *
  * IMPORTANT: baseURL is intentionally relative ('/api/v1') so all requests
- * go through the Vite dev-server proxy (which resolves 'backend:8000'
- * inside Docker). In production, nginx handles the proxying, so this
- * relative URL works there too.
+ * go through the Vite dev-server proxy (see vite.config.ts), which forwards
+ * to the locally running backend at http://localhost:8000.
  */
 import axios from 'axios'
 
-// In development, requests go through Vite proxy → backend:8000
-// In production, requests go through nginx → backend:8000
-// The relative baseURL works correctly in both environments.
+// Requests go through the Vite dev-server proxy → localhost:8000
 const API_BASE = '/api/v1'
 
 const api = axios.create({

@@ -5,7 +5,10 @@ django-cors-headers==4.6.0
 django-filter==24.3
 
 # Database
-psycopg2-binary==2.9.10
+mysqlclient==2.2.7
+
+# Environment loading (native local dev — no Docker env_file)
+python-dotenv==1.0.1
 
 # Auth
 djangorestframework-simplejwt==5.3.1
@@ -22,12 +25,19 @@ channels-redis==4.2.1
 daphne==4.1.2
 
 # File handling
-python-magic==0.4.27
+# python-magic needs the system libmagic library, which Windows doesn't
+# ship — python-magic-bin bundles the DLL. Linux/CI still use python-magic
+# (libmagic1 is installed separately there).
+python-magic==0.4.27; sys_platform != "win32"
+python-magic-bin==0.4.14; sys_platform == "win32"
 Pillow==11.0.0
 openpyxl==3.1.5
 
 # Scraping
 selenium==4.27.1
+# Auto-downloads/caches a matching chromedriver when CHROMEDRIVER_PATH is
+# unset — see apps/scraping/scrapers/base.py's Chrome driver fallback.
+webdriver-manager==4.0.2
 beautifulsoup4==4.12.3
 requests==2.32.3
 lxml==5.3.0

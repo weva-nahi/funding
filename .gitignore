@@ -2,12 +2,10 @@
 .env
 *.env
 !.env.example
-!.env.prod.example
 
 # Certificates / keys
 *.pem
 *.key
-nginx/certs/
 
 # Cookies / sessions
 cookies*.txt
@@ -45,6 +43,7 @@ dist-ssr/
 npm-debug.log*
 yarn-error.log*
 .vite/
+*.tsbuildinfo
 
 # Django generated
 media/

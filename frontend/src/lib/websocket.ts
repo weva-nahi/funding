@@ -1,8 +1,7 @@
 /**
  * WebSocket manager with auto-reconnect and exponential backoff.
  *
- * In development: Vite proxies /ws/ → ws://backend:8000/ws/
- * In production:  nginx proxies /ws/ → ws://backend:8000/ws/
+ * Vite proxies /ws/ → ws://localhost:8000/ws/ (see vite.config.ts).
  */
 import { getAccessToken } from './axios'
 

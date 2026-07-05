@@ -10,16 +10,17 @@ jobs:
   backend-test:
     runs-on: ubuntu-latest
     services:
-      postgres:
-        image: postgres:16-alpine
+      mysql:
+        image: mysql:8.0
         env:
-          POSTGRES_DB: richat_test_db
-          POSTGRES_USER: richat_user
-          POSTGRES_PASSWORD: testpassword123
+          MYSQL_DATABASE: richat_test_db
+          MYSQL_USER: richat_user
+          MYSQL_PASSWORD: testpassword123
+          MYSQL_RANDOM_ROOT_PASSWORD: "yes"
         ports:
-          - 5432:5432
+          - 3306:3306
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "mysqladmin ping -h localhost -u richat_user -ptestpassword123"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -36,6 +37,9 @@ jobs:
       with:
         python-version: '3.11'
         cache: 'pip'
+
+    - name: Install MySQL client headers
+      run: sudo apt-get update && sudo apt-get install -y --no-install-recommends default-libmysqlclient-dev pkg-config
 
     - name: Install dependencies
       run: |
@@ -55,11 +59,11 @@ jobs:
       env:
         SECRET_KEY: ci-test-secret-key-not-for-production
         DJANGO_SETTINGS_MODULE: config.settings.test
-        POSTGRES_DB: richat_test_db
-        POSTGRES_USER: richat_user
-        POSTGRES_PASSWORD: testpassword123
-        POSTGRES_HOST: localhost
-        POSTGRES_PORT: "5432"
+        MYSQL_DATABASE: richat_test_db
+        MYSQL_USER: richat_user
+        MYSQL_PASSWORD: testpassword123
+        MYSQL_HOST: localhost
+        MYSQL_PORT: "3306"
         REDIS_CACHE_URL: redis://localhost:6379/4
         CELERY_BROKER_URL: redis://localhost:6379/1
         CELERY_RESULT_BACKEND: redis://localhost:6379/2

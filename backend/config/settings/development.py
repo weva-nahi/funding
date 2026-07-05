@@ -5,7 +5,7 @@ from .base import *  # noqa: F401,F403
 DEBUG = True
 
 ALLOWED_HOSTS = list(  # noqa: F405
-    {*ALLOWED_HOSTS, "localhost", "127.0.0.1", "0.0.0.0", "backend", "[::1]"}  # noqa: F405
+    {*ALLOWED_HOSTS, "localhost", "127.0.0.1", "0.0.0.0", "[::1]"}  # noqa: F405
 )
 
 EMAIL_BACKEND = os.environ.get(
