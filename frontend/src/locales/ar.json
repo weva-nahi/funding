@@ -5,6 +5,7 @@
     "applications": "طلباتي",
     "notifications": "الإشعارات",
     "consulting": "الاستشارات",
+    "messages": "الرسائل",
     "profile": "الملف الشخصي",
     "saved": "المحفوظات",
     "logout": "تسجيل الخروج",
@@ -290,6 +291,17 @@
       "rejected": "مرفوض"
     }
   },
+  "messages": {
+    "title": "الرسائل",
+    "subtitle": "محادثتك مع فريق ريشات",
+    "adminSubtitle": "جميع المحادثات مع عملائك",
+    "noContacts": "لا توجد محادثات بعد",
+    "emptyStateCta": "قدّم طلب تمويل أو طلب استشارة لبدء محادثة مع فريق ريشات.",
+    "browseOpportunities": "تصفح الفرص",
+    "askConsulting": "اطلب استشارة",
+    "selectConversation": "اختر محادثة",
+    "searchContacts": "البحث عن جهة اتصال…"
+  },
   "profile": {
     "title": "ملفي الشخصي",
     "subtitle": "إدارة معلومات حسابك",
@@ -436,6 +448,7 @@
     "excelImport": "استيراد Excel",
     "scraping": "الجمع الآلي",
     "consulting": "الاستشارات",
+    "messages": "الرسائل",
     "users": "المستخدمون",
     "analytics": "التحليلات",
     "auditLogs": "سجلات التدقيق",

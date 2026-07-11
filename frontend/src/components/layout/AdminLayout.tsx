@@ -8,7 +8,7 @@ import api from '@/lib/axios'
 import { formatRelativeDate } from '@/utils/formatDate'
 import { richatLogo } from '@/lib/sourceLogos'
 import {
-  LayoutDashboard, FileText, Globe, Upload, Bot, MessageSquare,
+  LayoutDashboard, FileText, Globe, Upload, Bot, MessageSquare, Inbox,
   Users, BarChart3, Shield, LogOut, Menu, ChevronDown, Bell, User,
   CheckCheck, FileTextIcon, MessageSquareIcon, GlobeIcon,
 } from 'lucide-react'
@@ -21,6 +21,7 @@ const navItems = [
   { to: '/admin/excel-import', icon: Upload, key: 'excelImport' },
   { to: '/admin/scraping', icon: Bot, key: 'scraping' },
   { to: '/admin/consulting', icon: MessageSquare, key: 'consulting' },
+  { to: '/admin/messages', icon: Inbox, key: 'messages' },
   { to: '/admin/users', icon: Users, key: 'users' },
   { to: '/admin/analytics', icon: BarChart3, key: 'analytics' },
   { to: '/admin/audit', icon: Shield, key: 'auditLogs' },
@@ -29,6 +30,7 @@ const navItems = [
 const notifIcons: Record<string, typeof Bell> = {
   application_status: FileTextIcon,
   consulting_response: MessageSquareIcon,
+  new_message: MessageSquareIcon,
   new_opportunity: GlobeIcon,
   system: Bell,
   deadline_reminder: Bell,
@@ -58,6 +60,13 @@ export function AdminLayout() {
     queryFn: () => api.get('/notifications/unread-count/').then(r => r.data),
     refetchInterval: 15000,
   })
+
+  const { data: messagesUnreadData } = useQuery<{ unread_count: number }>({
+    queryKey: ['admin-messages-unread-count'],
+    queryFn: () => api.get('/messaging/unread-count/').then(r => r.data),
+    refetchInterval: 15000,
+  })
+  const messagesUnreadCount = messagesUnreadData?.unread_count ?? 0
 
   const markRead = useMutation({
     mutationFn: (id: number) => api.post(`/notifications/${id}/read/`),
@@ -124,6 +133,11 @@ export function AdminLayout() {
               <Link key={to} to={to} onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${active ? 'bg-teal-500/20 text-teal-300' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
                 <Icon className="h-4 w-4" />{t(`adminNav.${key}`)}
+                {key === 'messages' && messagesUnreadCount > 0 && (
+                  <span className="ms-auto h-4 min-w-[1rem] flex items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white px-1">
+                    {messagesUnreadCount > 99 ? '99+' : messagesUnreadCount}
+                  </span>
+                )}
               </Link>
             )
           })}

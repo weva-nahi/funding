@@ -16,6 +16,7 @@ class Notification(TimestampMixin):
         ("scraping_complete", "Scraping Complete"),
         ("system", "System Announcement"),
         ("deadline_reminder", "Deadline Reminder"),
+        ("new_message", "New Message"),
     ]
 
     CATEGORY_CHOICES = [
@@ -24,6 +25,7 @@ class Notification(TimestampMixin):
         ("opportunity", "Opportunity"),
         ("scraping", "Scraping"),
         ("system", "System"),
+        ("messaging", "Messaging"),
     ]
 
     PRIORITY_CHOICES = [

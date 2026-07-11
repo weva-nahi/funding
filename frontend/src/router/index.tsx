@@ -24,6 +24,7 @@ import { MyApplicationsPage } from '@/pages/client/MyApplicationsPage'
 import { ApplicationDetailPage } from '@/pages/client/ApplicationDetailPage'
 import { NotificationsPage } from '@/pages/client/NotificationsPage'
 import { ConsultingPage } from '@/pages/client/ConsultingPage'
+import { MessagesPage } from '@/pages/client/MessagesPage'
 import { ProfilePage } from '@/pages/client/ProfilePage'
 
 import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage'
@@ -34,6 +35,7 @@ import { OpportunityFormPage } from '@/pages/admin/OpportunityFormPage'
 import { ExcelImportPage } from '@/pages/admin/ExcelImportPage'
 import { ScrapingDashboardPage } from '@/pages/admin/ScrapingDashboardPage'
 import { ConsultingRequestsPage } from '@/pages/admin/ConsultingRequestsPage'
+import { AdminMessagesPage } from '@/pages/admin/AdminMessagesPage'
 import { UsersPage } from '@/pages/admin/UsersPage'
 import { AnalyticsPage } from '@/pages/admin/AnalyticsPage'
 import { AuditLogsPage } from '@/pages/admin/AuditLogsPage'
@@ -64,6 +66,7 @@ export function AppRouter() {
         <Route path="/applications/:id" element={<ApplicationDetailPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/consulting" element={<ConsultingPage />} />
+        <Route path="/messages" element={<MessagesPage />} />
         <Route path="/profile" element={<ProfilePage />} />
       </Route>
 
@@ -77,6 +80,7 @@ export function AppRouter() {
         <Route path="/admin/excel-import" element={<ExcelImportPage />} />
         <Route path="/admin/scraping" element={<ScrapingDashboardPage />} />
         <Route path="/admin/consulting" element={<ConsultingRequestsPage />} />
+        <Route path="/admin/messages" element={<AdminMessagesPage />} />
         <Route path="/admin/users" element={<UsersPage />} />
         <Route path="/admin/analytics" element={<AnalyticsPage />} />
         <Route path="/admin/audit" element={<AuditLogsPage />} />

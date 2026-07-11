@@ -158,6 +158,25 @@ def add_message(*, application: Application, sender, content: str = "", attachme
         msg.attachment = attachment
         msg.attachment_name = attachment.name
     msg.save()
+
+    from apps.notifications.services import create_notification, notify_all_admins
+
+    preview = (content or (attachment.name if attachment else "")).strip()[:120]
+    if sender.role == "admin":
+        create_notification(
+            user=application.user,
+            message=f"Richat: {preview}" if preview else "New message from the Richat team.",
+            notification_type="new_message",
+            category="messaging",
+            link="/messages",
+        )
+    else:
+        notify_all_admins(
+            message=f"{application.user.email}: {preview}" if preview else f"New message from {application.user.email}.",
+            notification_type="new_message",
+            category="messaging",
+            link=f"/admin/messages?contact={application.user_id}",
+        )
     return msg
 
 

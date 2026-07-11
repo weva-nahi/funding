@@ -1,11 +1,10 @@
-import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import api from '@/lib/axios'
 import { formatDate, formatRelativeDate } from '@/utils/formatDate'
-import { useAuthStore } from '@/store'
-import { ArrowLeft, Download, Clock, Send, Paperclip, X } from 'lucide-react'
+import { ArrowLeft, Download, Clock } from 'lucide-react'
+import { MessageThread, type ThreadMessage } from '@/components/MessageThread'
 import type { Application, ApplicationDocument } from '@/types'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -15,26 +14,11 @@ const STATUS_COLORS: Record<string, string> = {
   rejected: 'bg-red-100 text-red-700',
 }
 
-interface Message {
-  id: number
-  sender_email: string
-  sender_role: string
-  content: string
-  attachment: string | null
-  attachment_name: string
-  created_at: string
-}
-
 export function ApplicationDetailPage() {
   const { t } = useTranslation()
   const { id } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { user } = useAuthStore()
-  const [message, setMessage] = useState('')
-  const [attachment, setAttachment] = useState<File | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
 
   const { data: app, isLoading } = useQuery<Application>({
     queryKey: ['application', id],
@@ -47,29 +31,23 @@ export function ApplicationDetailPage() {
     enabled: !!id,
   })
 
-  const { data: messages } = useQuery<Message[]>({
+  const { data: messages } = useQuery<ThreadMessage[]>({
     queryKey: ['app-messages', id],
     queryFn: () => api.get(`/applications/${id}/messages/`).then((r) => r.data),
     enabled: !!id,
     refetchInterval: 10000,
   })
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
   const sendMessage = useMutation({
-    mutationFn: () => {
+    mutationFn: ({ content, attachment }: { content: string; attachment: File | null }) => {
       const fd = new FormData()
-      if (message.trim()) fd.append('content', message)
+      if (content.trim()) fd.append('content', content)
       if (attachment) fd.append('attachment', attachment)
       return api.post(`/applications/${id}/messages/`, fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
     },
     onSuccess: () => {
-      setMessage('')
-      setAttachment(null)
       queryClient.invalidateQueries({ queryKey: ['app-messages', id] })
     },
   })
@@ -191,105 +169,15 @@ export function ApplicationDetailPage() {
           <p className="text-xs text-muted-foreground">{t('applications.conversationDesc')}</p>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 max-h-80">
-          {(messages?.length ?? 0) === 0 ? (
-            <p className="text-center text-sm text-muted-foreground py-8">
-              {t('applications.noMessages')}
-            </p>
-          ) : (
-            messages?.map((msg) => {
-              const isMe = msg.sender_email === user?.email
-              return (
-                <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                  <div
-                    className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
-                      isMe
-                        ? 'bg-primary text-primary-foreground rounded-br-sm'
-                        : 'bg-muted text-foreground rounded-bl-sm'
-                    }`}
-                  >
-                    {!isMe && (
-                      <p className="text-[10px] font-semibold mb-1 opacity-70">
-                        {msg.sender_role === 'admin' ? t('applications.richatTeam') : msg.sender_email}
-                      </p>
-                    )}
-                    {msg.content && <p>{msg.content}</p>}
-                    
-                    {/* FIXED: Properly wrapped attachment link with <a> tag */}
-                    {msg.attachment_name && (
-                      <a
-                        href={msg.attachment || '#'}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-1 mt-1 underline text-xs opacity-80 hover:opacity-100"
-                      >
-                        <Paperclip className="h-3 w-3" />
-                        {msg.attachment_name}
-                      </a>
-                    )}
-                    
-                    <p
-                      className={`text-[10px] mt-1 ${
-                        isMe ? 'opacity-70 text-right' : 'text-muted-foreground'
-                      }`}
-                    >
-                      {formatRelativeDate(msg.created_at)}
-                    </p>
-                  </div>
-                </div>
-              )
-            })
-          )}
-          <div ref={bottomRef} />
-        </div>
-
-        <div className="border-t p-4">
-          {attachment && (
-            <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
-              <Paperclip className="h-3 w-3" />
-              <span>{attachment.name}</span>
-              <button onClick={() => setAttachment(null)}>
-                <X className="h-3 w-3 text-red-500" />
-              </button>
-            </div>
-          )}
-          <div className="flex gap-2">
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="rounded-lg border p-2.5 hover:bg-muted transition-colors"
-              title="Attach file"
-            >
-              <Paperclip className="h-4 w-4 text-muted-foreground" />
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="application/pdf,image/*"
-              className="hidden"
-              onChange={(e) => setAttachment(e.target.files?.[0] ?? null)}
-            />
-            <input
-              type="text"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey && (message.trim() || attachment)) {
-                  e.preventDefault()
-                  sendMessage.mutate()
-                }
-              }}
-              placeholder={t('applications.writeMessage')}
-              className="flex-1 rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            <button
-              onClick={() => sendMessage.mutate()}
-              disabled={sendMessage.isPending || (!message.trim() && !attachment)}
-              className="rounded-lg bg-primary px-4 py-2.5 text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              <Send className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
+        <MessageThread
+          messages={messages ?? []}
+          viewerRole="client"
+          richatTeamLabel={t('applications.richatTeam')}
+          emptyStateText={t('applications.noMessages')}
+          placeholder={t('applications.writeMessage')}
+          onSend={(content, attachment) => sendMessage.mutate({ content, attachment })}
+          isSending={sendMessage.isPending}
+        />
       </div>
     </div>
   )

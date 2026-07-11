@@ -5,7 +5,8 @@ import { useTranslation } from 'react-i18next'
 import api from '@/lib/axios'
 import { formatDate, formatRelativeDate } from '@/utils/formatDate'
 import { extractError } from '@/utils/extractError'
-import { ArrowLeft, Clock, Lock, CheckCircle, XCircle, Star, Send, Paperclip, Download } from 'lucide-react'
+import { ArrowLeft, Clock, Lock, CheckCircle, XCircle, Star, Paperclip, Download } from 'lucide-react'
+import { MessageThread, type ThreadMessage } from '@/components/MessageThread'
 import type { Application, ApplicationDocument } from '@/types'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -13,16 +14,6 @@ const STATUS_COLORS: Record<string, string> = {
   shortlisted: 'bg-indigo-100 text-indigo-700',
   approved: 'bg-emerald-100 text-emerald-700',
   rejected: 'bg-red-100 text-red-700',
-}
-
-interface Message {
-  id: number
-  sender_email: string
-  sender_role: string
-  content: string
-  attachment: string | null
-  attachment_name: string
-  created_at: string
 }
 
 export function ApplicationDetailAdminPage() {
@@ -36,8 +27,6 @@ export function ApplicationDetailAdminPage() {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false)
   const [adminPassword, setAdminPassword] = useState('')
   const [passwordError, setPasswordError] = useState('')
-  const [message, setMessage] = useState('')
-  const [attachment, setAttachment] = useState<File | null>(null)
 
   const { data: app, isLoading } = useQuery<Application>({
     queryKey: ['admin-application-detail', id],
@@ -50,7 +39,7 @@ export function ApplicationDetailAdminPage() {
     enabled: !!id,
   })
 
-  const { data: messages, refetch: refetchMessages } = useQuery<Message[]>({
+  const { data: messages } = useQuery<ThreadMessage[]>({
     queryKey: ['admin-app-messages', id],
     queryFn: () => api.get(`/applications/admin/${id}/messages/`).then(r => r.data),
     enabled: !!id,
@@ -103,17 +92,15 @@ export function ApplicationDetailAdminPage() {
   }
 
   const sendMessage = useMutation({
-    mutationFn: () => {
+    mutationFn: ({ content, attachment }: { content: string; attachment: File | null }) => {
       const fd = new FormData()
-      if (message.trim()) fd.append('content', message)
+      if (content.trim()) fd.append('content', content)
       if (attachment) fd.append('attachment', attachment)
       return api.post(`/applications/admin/${id}/messages/`, fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
     },
     onSuccess: () => {
-      setMessage('')
-      setAttachment(null)
       queryClient.invalidateQueries({ queryKey: ['admin-app-messages', id] })
     },
   })
@@ -291,58 +278,15 @@ export function ApplicationDetailAdminPage() {
           <h2 className="font-semibold">{t('applications.conversation')}</h2>
           <p className="text-xs text-muted-foreground">{t('applications.conversationDescAdmin')}</p>
         </div>
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 max-h-80">
-          {(messages?.length ?? 0) === 0 ? (
-            <p className="text-center text-sm text-muted-foreground py-8">{t('applications.noMessages')}</p>
-          ) : (
-            messages?.map(msg => {
-              const isAdmin = msg.sender_role === 'admin'
-              return (
-                <div key={msg.id} className={`flex ${isAdmin ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
-                    isAdmin ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-muted text-foreground rounded-bl-sm'
-                  }`}>
-                    {!isAdmin && <p className="text-[10px] font-semibold mb-1 opacity-70">{msg.sender_email}</p>}
-                    {msg.content && <p>{msg.content}</p>}
-                    {msg.attachment_name && (
-                      <a href={msg.attachment || '#'} target="_blank" rel="noreferrer"
-                        className="flex items-center gap-1 mt-1 underline text-xs opacity-80">
-                        <Paperclip className="h-3 w-3" />{msg.attachment_name}
-                      </a>
-                    )}
-                    <p className={`text-[10px] mt-1 ${isAdmin ? 'opacity-70 text-right' : 'text-muted-foreground'}`}>
-                      {formatRelativeDate(msg.created_at)}
-                    </p>
-                  </div>
-                </div>
-              )
-            })
-          )}
-        </div>
-        <div className="border-t p-4">
-          {attachment && (
-            <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
-              <Paperclip className="h-3 w-3" /><span>{attachment.name}</span>
-              <button onClick={() => setAttachment(null)}><XCircle className="h-3 w-3 text-red-500" /></button>
-            </div>
-          )}
-          <div className="flex gap-2">
-            <label className="cursor-pointer rounded-lg border p-2.5 hover:bg-muted transition-colors" title="Attach file">
-              <Paperclip className="h-4 w-4 text-muted-foreground" />
-              <input type="file" accept="application/pdf,image/*" className="hidden"
-                onChange={e => setAttachment(e.target.files?.[0] ?? null)} />
-            </label>
-            <input type="text" value={message} onChange={e => setMessage(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && (message.trim() || attachment)) { e.preventDefault(); sendMessage.mutate() } }}
-              placeholder={t('applications.writeMessage')}
-              className="flex-1 rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
-            <button onClick={() => sendMessage.mutate()}
-              disabled={sendMessage.isPending || (!message.trim() && !attachment)}
-              className="rounded-lg bg-primary px-4 py-2.5 text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-              <Send className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
+        <MessageThread
+          messages={messages ?? []}
+          viewerRole="admin"
+          richatTeamLabel={t('applications.richatTeam')}
+          emptyStateText={t('applications.noMessages')}
+          placeholder={t('applications.writeMessage')}
+          onSend={(content, attachment) => sendMessage.mutate({ content, attachment })}
+          isSending={sendMessage.isPending}
+        />
       </div>
 
       {showPasswordDialog && (

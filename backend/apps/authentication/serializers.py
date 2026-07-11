@@ -65,6 +65,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             "notify_consulting_response",
             "notify_deadline_reminder",
             "notify_system_announcements",
+            "notify_new_message",
             "notify_email_enabled",
             "notify_frequency",
         ]

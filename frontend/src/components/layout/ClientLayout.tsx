@@ -9,7 +9,7 @@ import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { formatRelativeDate } from '@/utils/formatDate'
 import { richatLogo } from '@/lib/sourceLogos'
 import {
-  LayoutDashboard, Search, FileText, Bell, MessageSquare, User, LogOut, Menu, Bookmark,
+  LayoutDashboard, Search, FileText, Bell, MessageSquare, Inbox, User, LogOut, Menu, Bookmark,
   ChevronDown, CheckCheck, FileTextIcon, MessageSquareIcon, GlobeIcon,
 } from 'lucide-react'
 import type { NotificationItem, Paginated } from '@/types'
@@ -19,12 +19,14 @@ const navItems = [
   { to: '/opportunities', icon: Search, key: 'opportunities' },
   { to: '/applications', icon: FileText, key: 'applications' },
   { to: '/consulting', icon: MessageSquare, key: 'consulting' },
+  { to: '/messages', icon: Inbox, key: 'messages' },
   { to: '/profile', icon: User, key: 'profile' },
 ]
 
 const notifIcons: Record<string, typeof Bell> = {
   application_status: FileTextIcon,
   consulting_response: MessageSquareIcon,
+  new_message: MessageSquareIcon,
   new_opportunity: GlobeIcon,
   system: Bell,
   deadline_reminder: Bell,
@@ -57,6 +59,13 @@ export function ClientLayout() {
       .then((res) => setUnreadCount(res.data.unread_count ?? 0))
       .catch(() => {})
   }, [setUnreadCount])
+
+  const { data: messagesUnreadData } = useQuery<{ unread_count: number }>({
+    queryKey: ['client-messages-unread-count'],
+    queryFn: () => api.get('/messaging/unread-count/').then((r) => r.data),
+    refetchInterval: 15000,
+  })
+  const messagesUnreadCount = messagesUnreadData?.unread_count ?? 0
 
   useEffect(() => {
     const unsubscribe = notificationWS.subscribe((raw) => {
@@ -129,6 +138,11 @@ export function ClientLayout() {
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}>
                 <Icon className="h-4 w-4" />
                 {t(`nav.${key}`)}
+                {key === 'messages' && messagesUnreadCount > 0 && (
+                  <span className="ms-auto h-4 min-w-[1rem] flex items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white px-1">
+                    {messagesUnreadCount > 99 ? '99+' : messagesUnreadCount}
+                  </span>
+                )}
               </Link>
             )
           })}

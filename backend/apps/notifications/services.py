@@ -11,6 +11,7 @@ _PREFERENCE_MAP = {
     "consulting_response": "notify_consulting_response",
     "deadline_reminder": "notify_deadline_reminder",
     "system": "notify_system_announcements",
+    "new_message": "notify_new_message",
 }
 
 
@@ -56,6 +57,26 @@ def create_notification(*, user, message, notification_type, category="system", 
     )
     _send_realtime(notification)
     return notification
+
+
+def notify_all_admins(*, message, notification_type, category="system", priority="medium", link=""):
+    """Fan out a notification to every admin user.
+
+    There is no "assigned admin" concept in this codebase — every admin already
+    sees every application/consulting request unfiltered — so fan-out-to-all is
+    the only convention-consistent way to notify admins of a new client message.
+    """
+    from apps.authentication.models import User
+
+    for admin in User.objects.filter(role="admin", is_active=True):
+        create_notification(
+            user=admin,
+            message=message,
+            notification_type=notification_type,
+            category=category,
+            priority=priority,
+            link=link,
+        )
 
 
 def mark_as_read(*, notification_id, user):

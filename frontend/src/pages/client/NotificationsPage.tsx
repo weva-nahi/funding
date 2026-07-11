@@ -10,6 +10,7 @@ import type { NotificationItem, Paginated } from '@/types'
 const iconMap: Record<string, typeof Bell> = {
   application_status: FileText,
   consulting_response: MessageSquare,
+  new_message: MessageSquare,
   new_opportunity: Globe,
   system: Bell,
   deadline_reminder: Bell,
@@ -23,6 +24,8 @@ function getNotificationLink(n: NotificationItem): string | null {
       return '/applications'
     case 'consulting_response':
       return '/consulting'
+    case 'new_message':
+      return '/messages'
     case 'new_opportunity':
       return '/opportunities'
     case 'deadline_reminder':

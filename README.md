@@ -124,9 +124,9 @@ Services:
 **Development demo accounts** (created by `create_demo_accounts`, development only):
 
 | Role | Email | Password |
-|---|---|---|
-| Admin | admin@richat.mr | Admin1234! |
+|---|---|---| Admin | admin@richat.mr | Admin1234! |
 | Client | client@richat.mr | Client1234! |
+|
 
 ## Environment Variables
 

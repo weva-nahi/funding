@@ -83,6 +83,7 @@ class Profile(TimestampMixin):
     notify_consulting_response = models.BooleanField(default=True)
     notify_deadline_reminder = models.BooleanField(default=True)
     notify_system_announcements = models.BooleanField(default=True)
+    notify_new_message = models.BooleanField(default=True)
     notify_email_enabled = models.BooleanField(default=True)
 
     notify_frequency = models.CharField(

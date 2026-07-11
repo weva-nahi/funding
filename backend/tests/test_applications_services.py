@@ -4,6 +4,7 @@ import pytest
 
 from apps.applications.models import Application
 from apps.applications.services import (
+    add_message,
     approve_application,
     create_application,
     reject_application,
@@ -117,4 +118,21 @@ class TestReviewApplications:
         )
         assert Notification.objects.filter(
             user=pending_application.user, notification_type='application_status'
+        ).exists()
+
+
+@pytest.mark.django_db
+class TestAddMessage:
+    def test_client_message_notifies_all_admins(self, pending_application, client_user, admin_user):
+        from apps.notifications.models import Notification
+        add_message(application=pending_application, sender=client_user, content='Hello, question here.')
+        assert Notification.objects.filter(
+            user=admin_user, notification_type='new_message', category='messaging'
+        ).exists()
+
+    def test_admin_message_notifies_client(self, pending_application, admin_user):
+        from apps.notifications.models import Notification
+        add_message(application=pending_application, sender=admin_user, content='We are reviewing it.')
+        assert Notification.objects.filter(
+            user=pending_application.user, notification_type='new_message', category='messaging'
         ).exists()

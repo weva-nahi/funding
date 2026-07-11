@@ -111,6 +111,30 @@ export interface ConsultingRequest {
   updated_at: string
 }
 
+export interface ConversationMessage {
+  id: number
+  source: 'application' | 'consulting'
+  application_id: number | null
+  consulting_request_id: number | null
+  sender_email: string
+  sender_role: 'admin' | 'client'
+  content: string
+  attachment: string | null
+  attachment_name: string
+  created_at: string
+}
+
+export interface Contact {
+  user_id: number
+  email: string
+  display_name: string
+  company: string
+  avatar: string | null
+  last_message_preview: string
+  last_message_at: string
+  unread_count: number
+}
+
 export interface AuditLog {
   id: number
   user_email: string | null

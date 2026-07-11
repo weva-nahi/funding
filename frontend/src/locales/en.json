@@ -5,6 +5,7 @@
     "applications": "My Applications",
     "notifications": "Notifications",
     "consulting": "Consulting",
+    "messages": "Messages",
     "profile": "Profile",
     "saved": "Saved",
     "logout": "Logout",
@@ -290,6 +291,17 @@
       "rejected": "Rejected"
     }
   },
+  "messages": {
+    "title": "Messages",
+    "subtitle": "Your conversation with the Richat team",
+    "adminSubtitle": "All conversations with your clients",
+    "noContacts": "No conversations yet",
+    "emptyStateCta": "Submit an application or a consulting request to start a conversation with the Richat team.",
+    "browseOpportunities": "Browse opportunities",
+    "askConsulting": "Ask for consulting",
+    "selectConversation": "Select a conversation",
+    "searchContacts": "Search contacts…"
+  },
   "profile": {
     "title": "My Profile",
     "subtitle": "Manage your account information",
@@ -436,6 +448,7 @@
     "excelImport": "Excel Import",
     "scraping": "Scraping",
     "consulting": "Consulting",
+    "messages": "Messages",
     "users": "Users",
     "analytics": "Analytics",
     "auditLogs": "Audit Logs",

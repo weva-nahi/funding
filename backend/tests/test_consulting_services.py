@@ -89,3 +89,29 @@ class TestConsultingFlow:
         add_message(request_id=req.id, sender=admin_user, content="Reply 2")
         # No exception — multiple messages from same sender are allowed
         assert req.messages.count() == 2
+
+    def test_client_message_notifies_all_admins(self, client_user, admin_user):
+        from apps.notifications.models import Notification
+
+        req = create_request(user=client_user, description="Need help.", priority="medium")
+        add_message(request_id=req.id, sender=client_user, content="Any update?")
+        assert Notification.objects.filter(
+            user=admin_user, notification_type="new_message", category="messaging"
+        ).exists()
+
+    def test_admin_message_notifies_client(self, client_user, admin_user):
+        from apps.notifications.models import Notification
+
+        req = create_request(user=client_user, description="Need help.", priority="medium")
+        add_message(request_id=req.id, sender=admin_user, content="We can help.")
+        assert Notification.objects.filter(
+            user=client_user, notification_type="new_message", category="messaging"
+        ).exists()
+
+    def test_create_request_notifies_all_admins(self, client_user, admin_user):
+        from apps.notifications.models import Notification
+
+        create_request(user=client_user, description="I need help with GEF application.", priority="medium")
+        assert Notification.objects.filter(
+            user=admin_user, notification_type="new_message", category="messaging"
+        ).exists()
